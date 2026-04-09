@@ -1,16 +1,21 @@
 #include "xsrt_env.h"
 
 #include <stddef.h>
-#include <string.h>
 
 #include "xsrt_platform.h"
 
 void xsrt_init(xsrt_env_t *env) {
+  uint64_t *words;
+  unsigned long index;
+
   if (env == NULL) {
     return;
   }
 
-  memset(env, 0, sizeof(*env));
+  words = (uint64_t *) env;
+  for (index = 0; index < sizeof(*env) / sizeof(uint64_t); ++index) {
+    words[index] = 0;
+  }
   xsrt_platform_init(env);
 }
 

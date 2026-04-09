@@ -34,6 +34,7 @@ class ComposePlan:
 class BuildArtifact:
     suite_name: str
     build_dir: Path
+    generated_suite_path: Path
     elf_path: Path | None = None
     bin_path: Path | None = None
     build_manifest_path: Path | None = None

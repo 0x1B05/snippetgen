@@ -14,6 +14,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from generator.xsgen.snippet_db import load_snippet_db
 from generator.xsgen.suite_loader import build_compose_plan, load_suite
+from generator.xsgen.emitter import emit_harness
+from generator.xsgen.toolchain import artifact_paths_for_suite, build_artifacts
 
 
 def cmd_list_snippets(_: argparse.Namespace) -> int:
@@ -27,18 +29,33 @@ def cmd_dump_plan(args: argparse.Namespace) -> int:
     snippet_db = load_snippet_db(REPO_ROOT)
     suite = load_suite(REPO_ROOT / args.suite)
     plan = build_compose_plan(suite, snippet_db)
+    artifact = artifact_paths_for_suite(REPO_ROOT, plan.suite_name)
     payload = {
         "suite": plan.suite_name,
         "target": plan.target,
         "seed": plan.seed,
         "snippet_ids": list(plan.snippet_ids),
+        "artifacts": {
+            "build_dir": str(artifact.build_dir),
+            "generated_suite": str(artifact.generated_suite_path),
+            "elf": str(artifact.elf_path),
+            "bin": str(artifact.bin_path),
+            "build_manifest": str(artifact.build_manifest_path),
+        },
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 
 
-def cmd_build(_: argparse.Namespace) -> int:
-    raise SystemExit("build not implemented yet: emitter and toolchain land in a later round")
+def cmd_build(args: argparse.Namespace) -> int:
+    snippet_db = load_snippet_db(REPO_ROOT)
+    suite = load_suite(REPO_ROOT / args.suite)
+    plan = build_compose_plan(suite, snippet_db)
+    artifact = artifact_paths_for_suite(REPO_ROOT, plan.suite_name)
+    emit_harness(plan, artifact.generated_suite_path)
+    build_artifacts(REPO_ROOT, plan, artifact)
+    print(artifact.build_manifest_path)
+    return 0
 
 
 def cmd_run(_: argparse.Namespace) -> int:

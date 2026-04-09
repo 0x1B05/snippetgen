@@ -124,8 +124,32 @@ class SnippetLoadingTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 snippet_db.load_manifest(missing_fields_manifest, tmp_root)
 
-            with self.assertRaises(ValueError):
+            with self.assertRaisesRegex(ValueError, "not implemented in ELF-first PoC"):
                 snippet_db.load_manifest(stream_manifest, tmp_root)
+
+    def test_manifest_loader_rejects_invalid_snippet_id(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            source_path = tmp_root / "demo.c"
+            source_path.write_text("int demo(void) { return 0; }\n")
+
+            bad_id_manifest = tmp_root / "bad_id.yaml"
+            bad_id_manifest.write_text(
+                textwrap.dedent(
+                    """
+                    id: bad-id
+                    kind: proc
+                    lang: c
+                    sources:
+                      - demo.c
+                    """
+                ).strip()
+            )
+
+            with self.assertRaisesRegex(ValueError, "invalid snippet id"):
+                snippet_db.load_manifest(bad_id_manifest, tmp_root)
 
     def test_suite_loader_rejects_future_only_modes_and_unknown_snippets(self) -> None:
         snippet_db = importlib.import_module("generator.xsgen.snippet_db")
@@ -149,6 +173,8 @@ class SnippetLoadingTest(unittest.TestCase):
             )
             with self.assertRaises(ValueError):
                 suite_loader.load_suite(future_mode_suite)
+            with self.assertRaisesRegex(ValueError, "future-only"):
+                suite_loader.load_suite(future_mode_suite)
 
             real_db = snippet_db.load_snippet_db(ROOT)
             unknown_snippet_suite = tmp_root / "unknown.yaml"
@@ -168,6 +194,50 @@ class SnippetLoadingTest(unittest.TestCase):
             suite = suite_loader.load_suite(unknown_snippet_suite)
             with self.assertRaises(ValueError):
                 suite_loader.build_compose_plan(suite, real_db)
+
+    def test_suite_loader_rejects_unsupported_target(self) -> None:
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bad_target_suite = Path(tmpdir) / "bad_target.yaml"
+            bad_target_suite.write_text(
+                textwrap.dedent(
+                    """
+                    suite: bad_target
+                    target: totally-unsupported
+                    seed: 3
+                    compose:
+                      mode: sequence
+                      snippets:
+                        - init_basic_env
+                    """
+                ).strip()
+            )
+
+            with self.assertRaisesRegex(ValueError, "unsupported target"):
+                suite_loader.load_suite(bad_target_suite)
+
+    def test_suite_loader_rejects_invalid_suite_name(self) -> None:
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            bad_suite_name = Path(tmpdir) / "bad_suite_name.yaml"
+            bad_suite_name.write_text(
+                textwrap.dedent(
+                    """
+                    suite: ../escaped_out
+                    target: xiangshan-verilator
+                    seed: 4
+                    compose:
+                      mode: sequence
+                      snippets:
+                        - init_basic_env
+                    """
+                ).strip()
+            )
+
+            with self.assertRaisesRegex(ValueError, "invalid suite name"):
+                suite_loader.load_suite(bad_suite_name)
 
     def test_cli_dump_plan_and_list_snippets(self) -> None:
         list_result = subprocess.run(
@@ -195,8 +265,13 @@ class SnippetLoadingTest(unittest.TestCase):
             ["init_basic_env", "arm_timer", "unaligned_load", "check_scalar_load_legality", "finish_check"],
             plan["snippet_ids"],
         )
+        self.assertTrue(plan["artifacts"]["build_dir"].endswith("build/scalar_load_legality_poc"))
+        self.assertTrue(plan["artifacts"]["generated_suite"].endswith("build/scalar_load_legality_poc/generated_suite.c"))
+        self.assertTrue(plan["artifacts"]["elf"].endswith("build/scalar_load_legality_poc/test.elf"))
+        self.assertTrue(plan["artifacts"]["bin"].endswith("build/scalar_load_legality_poc/test.bin"))
+        self.assertTrue(plan["artifacts"]["build_manifest"].endswith("build/scalar_load_legality_poc/build_manifest.json"))
 
-    def test_cli_build_is_explicit_and_not_a_false_positive(self) -> None:
+    def test_cli_build_generates_real_artifacts(self) -> None:
         result = subprocess.run(
             ["make", "build"],
             cwd=ROOT,
@@ -204,8 +279,7 @@ class SnippetLoadingTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        self.assertNotEqual(0, result.returncode)
-        self.assertIn("not implemented", result.stderr.lower() + result.stdout.lower())
+        self.assertEqual(0, result.returncode, msg=result.stderr)
 
 
 if __name__ == "__main__":

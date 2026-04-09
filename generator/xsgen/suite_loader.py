@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from collections.abc import Mapping
+import re
 
 import yaml
 
 from generator.xsgen.model import ComposePlan, SnippetSpec, SuiteSpec
+
+SUPPORTED_TARGET = "xiangshan-verilator"
+SUITE_NAME_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.-]*$")
 
 
 def _require_mapping(data: object, path: Path) -> dict:
@@ -22,9 +26,17 @@ def load_suite(path: Path) -> SuiteSpec:
         if field not in data:
             raise ValueError(f"{path} missing required field: {field}")
 
+    suite_name = str(data["suite"])
+    if SUITE_NAME_RE.fullmatch(suite_name) is None:
+        raise ValueError(f"{path} invalid suite name: {suite_name}")
+
+    target = str(data["target"])
+    if target != SUPPORTED_TARGET:
+        raise ValueError(f"{path} unsupported target: {target}")
+
     mode = compose.get("mode")
     if mode != "sequence":
-        raise ValueError(f"{path} unsupported compose mode: {mode}")
+        raise ValueError(f"{path} compose mode '{mode}' is future-only in ELF-first PoC")
 
     snippet_ids = compose.get("snippets")
     if not isinstance(snippet_ids, list) or not snippet_ids:
@@ -33,8 +45,8 @@ def load_suite(path: Path) -> SuiteSpec:
         raise ValueError(f"{path} field 'compose.snippets' contains an invalid snippet id")
 
     return SuiteSpec(
-        name=str(data["suite"]),
-        target=str(data["target"]),
+        name=suite_name,
+        target=target,
         seed=int(data["seed"]),
         compose_mode=str(mode),
         snippet_ids=tuple(snippet_ids),
