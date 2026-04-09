@@ -11,7 +11,7 @@ plan_tracked: true
 start_branch: master
 base_branch: master
 base_commit: 2160d814e0773b45d256c569aa94b6b7b922bc6e
-review_started: false
+review_started: true
 ask_codex_question: true
 session_id:
 agent_teams: false
