@@ -1,0 +1,5 @@
+id: init_basic_env
+kind: proc
+lang: c
+sources:
+  - snippets/core/init_basic_env.c

@@ -31,7 +31,7 @@ RULES:
 ## MUTABLE SECTION
 <!-- Update each round with justification for changes -->
 
-### Plan Version: 2 (Updated: Round 1)
+### Plan Version: 5 (Updated: Round 2)
 
 #### Plan Evolution Log
 <!-- Document any changes to the plan with justification -->
@@ -40,15 +40,14 @@ RULES:
 | 0 | Initialized tracker from `detail-plan.md` and normalized the ACs into four independent checks | Preserve the original scope while making future round reviews easier | No scope change; AC-1 to AC-4 remain intact |
 | 0 | Narrowed the active implementation focus to `task1` after RLCR bootstrap completed in the same round | The loop remained on Round 0, so the round needed one concrete mainline coding objective | No scope change; only execution focus moved to the first planned task |
 | 1 | Re-anchored to the Codex review result and set Round 1 mainline work to the runtime baseline plus snippet ABI | The first review verified `task1` and identified AC-2 and AC-3 as the next missing mainline work | No scope change; execution focus moved from scaffolding to the minimal runtime interface |
+| 1 | Codex verified `task2` and `task3`, but rejected treating `task4` through `task12` as queued follow-up work | The original plan's lower bound still requires snippets, manifests, suite loading, harness generation, and stable `ELF/bin` artifacts before the first-stage PoC is complete | No scope change; the next round must resume the end-to-end chain for AC-1, AC-2, and AC-4 |
+| 2 | Re-anchored Round 2 to the snippet/manifests plus loading-layer milestone (`task4` through `task7`) | The latest review identified AC-1 and the remaining AC-3 work as the next concrete prerequisite for emitter and toolchain work | No scope change; execution focus moves from runtime baseline to plan inputs and deterministic loading |
+| 2 | Fixed the misleading `make build` no-op by routing `build` through `generator/cli.py`, which now fails explicitly until the emitter and toolchain land | The prior review flagged the silent green build target as blocking future AC-4 verification | No scope change; the fix only removes a false-positive path and keeps later build work honest |
 
 #### Active Tasks
 <!-- Mainline tasks only: each task must directly advance the current round objective and carry routing metadata -->
 | Task | Target AC | Status | Tag | Owner | Notes |
 |------|-----------|--------|-----|-------|-------|
-| task4: Implement the 5 PoC snippets and their manifests | AC-1, AC-3 | pending | coding | claude | Keep snippet set minimal |
-| task5: Implement Python data models for `SnippetSpec`, `SuiteSpec`, `ComposePlan`, and `BuildArtifact` | AC-1 | pending | coding | claude | Host-side model layer |
-| task6: Implement `snippet_db.py` to scan manifests, validate required fields, and resolve source file paths | AC-1 | pending | coding | claude | Depends on task5 |
-| task7: Implement `suite_loader.py` to load the PoC suite, validate `sequence` mode, and produce a deterministic plan | AC-1 | pending | coding | claude | Depends on task5 |
 | task8: Implement `emitter.py` to generate `build/<suite>/generated_suite.c` from the ordered snippet list | AC-2 | pending | coding | claude | Depends on task6 and task7 |
 | task9: Implement `toolchain.py` to compile runtime/snippet/harness sources, link `test.elf`, and export `test.bin` | AC-4 | pending | coding | claude | Depends on task2, task4, and task8 |
 | task10: Create `scalar_load_legality_poc.yaml` and verify the build path generates `test.elf`, `test.bin`, and `build_manifest.json` | AC-1, AC-4 | pending | coding | claude | First end-to-end proof point |
@@ -73,8 +72,12 @@ RULES:
 | AC | Task | Completed Round | Verified Round | Evidence |
 |----|------|-----------------|----------------|----------|
 | AC-4 | task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | 0 | 0 | Codex re-ran `python3 -m unittest tests/test_repo_layout.py` and `make test-layout`, both of which passed on the reviewed tree |
-| AC-3 | task2: Implement minimal runtime headers and source stubs for env, CSR, trap, timer, finish helpers | 1 | pending | `python3 -m unittest tests/test_runtime_surface.py` passed, including file-surface checks and a compiled host-side smoke exercising the runtime API |
-| AC-2, AC-3 | task3: Define `xsrt_snippet_desc_t` and a helper runner for `init/run/check/fini` calling convention | 1 | pending | `python3 -m unittest tests/test_runtime_surface.py` passed, including the runner-order smoke test via `xsrt_run_snippet()` |
+| AC-3 | task2: Implement minimal runtime headers and source stubs for env, CSR, trap, timer, finish helpers | 1 | 1 | Codex re-ran `python3 -m unittest tests/test_runtime_surface.py`; the suite passed and confirmed the runtime file surface plus the host-side smoke compile/run path |
+| AC-2, AC-3 | task3: Define `xsrt_snippet_desc_t` and a helper runner for `init/run/check/fini` calling convention | 1 | 1 | Codex re-ran `python3 -m unittest tests/test_runtime_surface.py`; the suite passed and confirmed the descriptor surface and `xsrt_run_snippet()` call order smoke |
+| AC-1, AC-3 | task4: Implement the 5 PoC snippets and their manifests | 2 | pending | `python3 -m unittest tests/test_snippet_loading.py` passed, including real manifest loading and host compilation of all five snippet sources |
+| AC-1 | task5: Implement Python data models for `SnippetSpec`, `SuiteSpec`, `ComposePlan`, and `BuildArtifact` | 2 | pending | `python3 -m unittest tests/test_snippet_loading.py` passed, including imports and use of the typed model objects through the loader path |
+| AC-1 | task6: Implement `snippet_db.py` to scan manifests, validate required fields, and resolve source file paths | 2 | pending | `python3 -m unittest tests/test_snippet_loading.py` passed, including manifest field validation, unsupported `kind` rejection, and real snippet DB loading |
+| AC-1 | task7: Implement `suite_loader.py` to load the PoC suite, validate `sequence` mode, and produce a deterministic plan | 2 | pending | `python3 -m unittest tests/test_snippet_loading.py` passed, including future-only mode rejection, unknown snippet rejection, and deterministic real-plan generation |
 
 ### Explicitly Deferred
 <!-- Items here require strong justification -->

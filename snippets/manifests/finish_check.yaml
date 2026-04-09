@@ -1,0 +1,5 @@
+id: finish_check
+kind: proc
+lang: c
+sources:
+  - snippets/core/finish_check.c

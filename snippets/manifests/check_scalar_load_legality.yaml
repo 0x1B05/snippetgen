@@ -1,0 +1,5 @@
+id: check_scalar_load_legality
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_load_legality/check_scalar_load_legality.c

@@ -1,0 +1,5 @@
+id: unaligned_load
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_load_legality/unaligned_load.c
