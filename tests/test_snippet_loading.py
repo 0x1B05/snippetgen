@@ -264,6 +264,35 @@ class SnippetLoadingTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "invalid suite name"):
                 suite_loader.load_suite(bad_suite_name)
 
+    def test_suite_loader_rejects_non_integer_or_negative_seed(self) -> None:
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            cases = {
+                "negative": "-1",
+                "float": "1.5",
+                "boolean": "true",
+            }
+            for name, raw_seed in cases.items():
+                suite_path = tmp_root / f"{name}.yaml"
+                suite_path.write_text(
+                    textwrap.dedent(
+                        f"""
+                        suite: {name}
+                        target: xiangshan-verilator
+                        seed: {raw_seed}
+                        compose:
+                          mode: sequence
+                          snippets:
+                            - init_basic_env
+                        """
+                    ).strip()
+                )
+                with self.subTest(seed_case=name):
+                    with self.assertRaisesRegex(ValueError, "invalid seed"):
+                        suite_loader.load_suite(suite_path)
+
     def test_cli_dump_plan_and_list_snippets(self) -> None:
         list_result = subprocess.run(
             ["python3", "generator/cli.py", "list-snippets"],
@@ -295,6 +324,11 @@ class SnippetLoadingTest(unittest.TestCase):
         self.assertTrue(plan["artifacts"]["elf"].endswith("build/scalar_load_legality_poc/test.elf"))
         self.assertTrue(plan["artifacts"]["bin"].endswith("build/scalar_load_legality_poc/test.bin"))
         self.assertTrue(plan["artifacts"]["build_manifest"].endswith("build/scalar_load_legality_poc/build_manifest.json"))
+
+    def test_unaligned_load_riscv_path_uses_real_word_load(self) -> None:
+        source = (ROOT / "snippets/scalar_load_legality/unaligned_load.c").read_text()
+        self.assertIn("__riscv", source)
+        self.assertIn('"lw %0, 0(%1)"', source)
 
     def test_declared_python_dependency(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text()

@@ -30,6 +30,10 @@ def load_suite(path: Path) -> SuiteSpec:
     if SUITE_NAME_RE.fullmatch(suite_name) is None:
         raise ValueError(f"{path} invalid suite name: {suite_name}")
 
+    raw_seed = data["seed"]
+    if isinstance(raw_seed, bool) or not isinstance(raw_seed, int) or raw_seed < 0:
+        raise ValueError(f"{path} invalid seed: {raw_seed}")
+
     target = str(data["target"])
     if target != SUPPORTED_TARGET:
         raise ValueError(f"{path} unsupported target: {target}")
@@ -47,7 +51,7 @@ def load_suite(path: Path) -> SuiteSpec:
     return SuiteSpec(
         name=suite_name,
         target=target,
-        seed=int(data["seed"]),
+        seed=raw_seed,
         compose_mode=str(mode),
         snippet_ids=tuple(snippet_ids),
     )

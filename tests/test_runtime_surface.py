@@ -66,6 +66,10 @@ class RuntimeSurfaceTest(unittest.TestCase):
         self.assertIn("void (*fini)(xsrt_env_t *env);", snippet_h)
         self.assertIn("int xsrt_run_snippet(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);", snippet_h)
 
+        start_s = (ROOT / "runtime/arch/riscv64/start.S").read_text()
+        self.assertIn("main", start_s)
+        self.assertRegex(start_s, r"\b(call|tail)\s+main\b")
+
     def test_runtime_c_surfaces_compile_and_runner_executes(self) -> None:
         smoke_c = textwrap.dedent(
             """
