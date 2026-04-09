@@ -31,7 +31,7 @@ RULES:
 ## MUTABLE SECTION
 <!-- Update each round with justification for changes -->
 
-### Plan Version: 1 (Updated: Round 0)
+### Plan Version: 2 (Updated: Round 1)
 
 #### Plan Evolution Log
 <!-- Document any changes to the plan with justification -->
@@ -39,14 +39,12 @@ RULES:
 |-------|--------|--------|--------------|
 | 0 | Initialized tracker from `detail-plan.md` and normalized the ACs into four independent checks | Preserve the original scope while making future round reviews easier | No scope change; AC-1 to AC-4 remain intact |
 | 0 | Narrowed the active implementation focus to `task1` after RLCR bootstrap completed in the same round | The loop remained on Round 0, so the round needed one concrete mainline coding objective | No scope change; only execution focus moved to the first planned task |
+| 1 | Re-anchored to the Codex review result and set Round 1 mainline work to the runtime baseline plus snippet ABI | The first review verified `task1` and identified AC-2 and AC-3 as the next missing mainline work | No scope change; execution focus moved from scaffolding to the minimal runtime interface |
 
 #### Active Tasks
 <!-- Mainline tasks only: each task must directly advance the current round objective and carry routing metadata -->
 | Task | Target AC | Status | Tag | Owner | Notes |
 |------|-----------|--------|-----|-------|-------|
-| task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | AC-4 | completed_pending_verification | coding | claude | Verified locally with `python3 -m unittest tests/test_repo_layout.py` and `make test-layout` |
-| task2: Implement minimal runtime headers and source stubs for env, CSR, trap, timer, finish helpers | AC-3 | pending | coding | claude | Depends on task1 |
-| task3: Define `xsrt_snippet_desc_t` and a helper runner for `init/run/check/fini` calling convention | AC-2, AC-3 | pending | coding | claude | Depends on task2 |
 | task4: Implement the 5 PoC snippets and their manifests | AC-1, AC-3 | pending | coding | claude | Keep snippet set minimal |
 | task5: Implement Python data models for `SnippetSpec`, `SuiteSpec`, `ComposePlan`, and `BuildArtifact` | AC-1 | pending | coding | claude | Host-side model layer |
 | task6: Implement `snippet_db.py` to scan manifests, validate required fields, and resolve source file paths | AC-1 | pending | coding | claude | Depends on task5 |
@@ -67,13 +65,16 @@ RULES:
 <!-- Non-blocking issues stay queued and must NOT replace the round objective -->
 | Issue | Discovered Round | Why Not Blocking | Revisit Trigger |
 |-------|-----------------|------------------|-----------------|
-| None | - | - | - |
+| Strengthen the task1 skeleton verification beyond directory checks | 0 | It does not block the Round 1 runtime and snippet ABI baseline, but it must be folded into later contract-level tests before claiming the full ELF-first chain | Revisit when expanding tests for generator/build artifacts |
+| Flesh out README and Makefile placeholders (`build`, `run`, `list-snippets`, `clean`) | 0 | Documentation and convenience targets do not block the runtime baseline | Revisit while wiring the host-side generator and top-level build flow |
 
 ### Completed and Verified
 <!-- Only move tasks here after Codex verification -->
 | AC | Task | Completed Round | Verified Round | Evidence |
 |----|------|-----------------|----------------|----------|
-| AC-4 | task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | 0 | pending | `python3 -m unittest tests/test_repo_layout.py` and `make test-layout` both passed after the skeleton was created |
+| AC-4 | task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | 0 | 0 | Codex re-ran `python3 -m unittest tests/test_repo_layout.py` and `make test-layout`, both of which passed on the reviewed tree |
+| AC-3 | task2: Implement minimal runtime headers and source stubs for env, CSR, trap, timer, finish helpers | 1 | pending | `python3 -m unittest tests/test_runtime_surface.py` passed, including file-surface checks and a compiled host-side smoke exercising the runtime API |
+| AC-2, AC-3 | task3: Define `xsrt_snippet_desc_t` and a helper runner for `init/run/check/fini` calling convention | 1 | pending | `python3 -m unittest tests/test_runtime_surface.py` passed, including the runner-order smoke test via `xsrt_run_snippet()` |
 
 ### Explicitly Deferred
 <!-- Items here require strong justification -->
