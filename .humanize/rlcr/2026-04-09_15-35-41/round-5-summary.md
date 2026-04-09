@@ -37,11 +37,6 @@
 - Updated `goal-tracker.md` to record the Round 5 review finding, the completed fix, the unchanged queued items, and the refreshed verification state.
 
 ## BitLesson Delta
-- Action: none
-- Lesson ID(s): NONE
-- Notes: `bitlesson-selector` did not surface any usable project-specific lesson for this tightly scoped review-fix round.
-
-## BitLesson Delta
-- Action: none
-- Lesson ID(s): NONE
-- Notes: `bitlesson-selector` returned only placeholder output again, and the review-round fixes did not produce a reusable project-specific lesson worth adding to `bitlesson.md`.
+Action: none
+Lesson ID(s): NONE
+Notes: `bitlesson-selector` did not surface any usable project-specific lesson for this tightly scoped review-fix round.
