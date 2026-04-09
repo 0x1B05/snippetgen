@@ -48,8 +48,9 @@ def cmd_dump_plan(args: argparse.Namespace) -> int:
 
 
 def cmd_build(args: argparse.Namespace) -> int:
+    suite_path = Path(args.suite) if args.suite is not None else Path("suites/scalar_load_legality_poc.yaml")
     snippet_db = load_snippet_db(REPO_ROOT)
-    suite = load_suite(REPO_ROOT / args.suite)
+    suite = load_suite(REPO_ROOT / suite_path)
     plan = build_compose_plan(suite, snippet_db)
     artifact = artifact_paths_for_suite(REPO_ROOT, plan.suite_name)
     emit_harness(plan, artifact.generated_suite_path)

@@ -112,7 +112,19 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
         self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
         self.assertTrue(manifest["commands"]["compile"])
+        self.assertTrue(manifest["commands"]["link"])
         self.assertTrue(manifest["commands"]["objcopy"])
+
+    def test_cli_build_defaults_to_poc_suite(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertTrue((ROOT / "build" / "scalar_load_legality_poc" / "build_manifest.json").is_file())
 
     def test_build_artifact_paths_are_stable(self) -> None:
         toolchain = importlib.import_module("generator.xsgen.toolchain")
@@ -196,6 +208,41 @@ class BuildPipelineTest(unittest.TestCase):
         with mock.patch.object(toolchain, "detect_toolchain", return_value=broken_toolchain):
             with self.assertRaisesRegex(RuntimeError, "objcopy"):
                 toolchain.build_artifacts(ROOT, plan, artifact)
+
+    def test_failed_rebuild_cleans_stale_outputs(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        suite = suite_loader.load_suite(ROOT / "suites/scalar_load_legality_poc.yaml")
+        plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+        artifact = toolchain.artifact_paths_for_suite(ROOT, "stale_cleanup_case")
+
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+        toolchain.build_artifacts(ROOT, plan, artifact)
+        self.assertTrue(artifact.elf_path.is_file())
+        self.assertTrue(artifact.bin_path.is_file())
+        self.assertTrue(artifact.build_manifest_path.is_file())
+
+        artifact.generated_suite_path.write_text("broken harness\n")
+        with self.assertRaises(RuntimeError):
+            toolchain.build_artifacts(ROOT, plan, artifact)
+        self.assertFalse(artifact.elf_path.exists())
+        self.assertFalse(artifact.bin_path.exists())
+        self.assertFalse(artifact.build_manifest_path.exists())
+
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+        toolchain.build_artifacts(ROOT, plan, artifact)
+        broken_toolchain = dict(toolchain.detect_toolchain())
+        broken_toolchain["objcopy"] = "/definitely/not/a/real/objcopy"
+
+        with mock.patch.object(toolchain, "detect_toolchain", return_value=broken_toolchain):
+            with self.assertRaises(RuntimeError):
+                toolchain.build_artifacts(ROOT, plan, artifact)
+        self.assertFalse(artifact.elf_path.exists())
+        self.assertFalse(artifact.bin_path.exists())
+        self.assertFalse(artifact.build_manifest_path.exists())
 
 
 if __name__ == "__main__":

@@ -62,42 +62,126 @@ def build_artifacts(
     plan: ComposePlan,
     artifact: BuildArtifact,
 ) -> BuildArtifact:
-    toolchain = detect_toolchain()
-    artifact.build_dir.mkdir(parents=True, exist_ok=True)
-
-    compile_cmd = [
-        toolchain["gcc"],
+    compile_flags = [
         "-march=rv64gc",
         "-mabi=lp64d",
         "-mcmodel=medany",
         "-ffreestanding",
-        "-nostdlib",
-        "-nostartfiles",
-        "-static",
-        "-Wl,-e,_start",
-        "-Wl,-Ttext=0x80000000",
+    ]
+    include_flags = [
         "-I",
         str((repo_root / "runtime" / "include").resolve()),
         "-I",
         str((repo_root / "snippets" / "include").resolve()),
         "-I",
         str((repo_root / "runtime" / "platform" / "xiangshan").resolve()),
-        "-o",
-        str(artifact.elf_path),
     ]
-    compile_cmd.extend(str(path.resolve()) for path in runtime_sources(repo_root))
-    for snippet in plan.snippets:
-        compile_cmd.extend(str(source) for source in snippet.sources)
-    compile_cmd.append(str(artifact.generated_suite_path))
+    toolchain = detect_toolchain()
+    object_dir = artifact.build_dir / "obj"
+    compile_commands: list[list[str]] = []
+    object_paths: list[str] = []
 
-    compile_result = subprocess.run(
-        compile_cmd,
+    artifact.build_dir.mkdir(parents=True, exist_ok=True)
+    if object_dir.exists():
+        shutil.rmtree(object_dir)
+    object_dir.mkdir(parents=True, exist_ok=True)
+
+    for path in (artifact.elf_path, artifact.bin_path, artifact.build_manifest_path):
+        if path.exists():
+            path.unlink()
+
+    for index, source_path in enumerate(runtime_sources(repo_root), start=1):
+        object_path = object_dir / f"{index:02d}_{source_path.stem}.o"
+        compile_cmd = [
+            toolchain["gcc"],
+            *compile_flags,
+            *include_flags,
+            "-c",
+            str(source_path.resolve()),
+            "-o",
+            str(object_path),
+        ]
+        compile_result = subprocess.run(
+            compile_cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        compile_commands.append(compile_cmd)
+        if compile_result.returncode != 0:
+            raise RuntimeError(compile_result.stderr or "RISC-V compile failed")
+        object_paths.append(str(object_path))
+
+    source_index = len(object_paths) + 1
+    for snippet in plan.snippets:
+        for source_path in snippet.sources:
+            object_path = object_dir / f"{source_index:02d}_{source_path.stem}.o"
+            compile_cmd = [
+                toolchain["gcc"],
+                *compile_flags,
+                *include_flags,
+                "-c",
+                str(source_path),
+                "-o",
+                str(object_path),
+            ]
+            compile_result = subprocess.run(
+                compile_cmd,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            compile_commands.append(compile_cmd)
+            if compile_result.returncode != 0:
+                raise RuntimeError(compile_result.stderr or "RISC-V compile failed")
+            object_paths.append(str(object_path))
+            source_index += 1
+
+    generated_object = object_dir / f"{source_index:02d}_{artifact.generated_suite_path.stem}.o"
+    generated_compile_cmd = [
+        toolchain["gcc"],
+        *compile_flags,
+        *include_flags,
+        "-c",
+        str(artifact.generated_suite_path),
+        "-o",
+        str(generated_object),
+    ]
+    generated_compile_result = subprocess.run(
+        generated_compile_cmd,
         check=False,
         capture_output=True,
         text=True,
     )
-    if compile_result.returncode != 0:
-        raise RuntimeError(compile_result.stderr or "RISC-V compile/link failed")
+    compile_commands.append(generated_compile_cmd)
+    if generated_compile_result.returncode != 0:
+        raise RuntimeError(generated_compile_result.stderr or "RISC-V compile failed")
+    object_paths.append(str(generated_object))
+
+    link_cmd = [
+        toolchain["gcc"],
+        *compile_flags,
+        "-nostdlib",
+        "-nostartfiles",
+        "-static",
+        "-Wl,-e,_start",
+        "-Wl,-Ttext=0x80000000",
+        "-o",
+        str(artifact.elf_path),
+    ]
+    link_cmd.extend(object_paths)
+
+    link_result = subprocess.run(
+        link_cmd,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if link_result.returncode != 0:
+        for path in (artifact.elf_path, artifact.bin_path, artifact.build_manifest_path):
+            if path.exists():
+                path.unlink()
+        raise RuntimeError(link_result.stderr or "RISC-V link failed")
 
     objcopy_cmd = [
         toolchain["objcopy"],
@@ -114,8 +198,14 @@ def build_artifacts(
             text=True,
         )
     except FileNotFoundError as exc:
+        for path in (artifact.elf_path, artifact.bin_path, artifact.build_manifest_path):
+            if path.exists():
+                path.unlink()
         raise RuntimeError(f"objcopy failed: {objcopy_cmd[0]}") from exc
     if objcopy_result.returncode != 0:
+        for path in (artifact.elf_path, artifact.bin_path, artifact.build_manifest_path):
+            if path.exists():
+                path.unlink()
         raise RuntimeError(objcopy_result.stderr or "RISC-V objcopy failed")
 
     manifest_payload = {
@@ -132,7 +222,8 @@ def build_artifacts(
             "build_manifest": str(artifact.build_manifest_path),
         },
         "commands": {
-            "compile": compile_cmd,
+            "compile": compile_commands,
+            "link": link_cmd,
             "objcopy": objcopy_cmd,
         },
     }
