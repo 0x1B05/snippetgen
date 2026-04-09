@@ -38,12 +38,13 @@ RULES:
 | Round | Change | Reason | Impact on AC |
 |-------|--------|--------|--------------|
 | 0 | Initialized tracker from `detail-plan.md` and normalized the ACs into four independent checks | Preserve the original scope while making future round reviews easier | No scope change; AC-1 to AC-4 remain intact |
+| 0 | Narrowed the active implementation focus to `task1` after RLCR bootstrap completed in the same round | The loop remained on Round 0, so the round needed one concrete mainline coding objective | No scope change; only execution focus moved to the first planned task |
 
 #### Active Tasks
 <!-- Mainline tasks only: each task must directly advance the current round objective and carry routing metadata -->
 | Task | Target AC | Status | Tag | Owner | Notes |
 |------|-----------|--------|-----|-------|-------|
-| task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | AC-4 | pending | coding | claude | First coding round entry point |
+| task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | AC-4 | completed_pending_verification | coding | claude | Verified locally with `python3 -m unittest tests/test_repo_layout.py` and `make test-layout` |
 | task2: Implement minimal runtime headers and source stubs for env, CSR, trap, timer, finish helpers | AC-3 | pending | coding | claude | Depends on task1 |
 | task3: Define `xsrt_snippet_desc_t` and a helper runner for `init/run/check/fini` calling convention | AC-2, AC-3 | pending | coding | claude | Depends on task2 |
 | task4: Implement the 5 PoC snippets and their manifests | AC-1, AC-3 | pending | coding | claude | Keep snippet set minimal |
@@ -72,6 +73,7 @@ RULES:
 <!-- Only move tasks here after Codex verification -->
 | AC | Task | Completed Round | Verified Round | Evidence |
 |----|------|-----------------|----------------|----------|
+| AC-4 | task1: Create `snippetgen-demo/` skeleton with top-level `Makefile`, `README.md`, and empty runtime/snippets/generator/suites directories | 0 | pending | `python3 -m unittest tests/test_repo_layout.py` and `make test-layout` both passed after the skeleton was created |
 
 ### Explicitly Deferred
 <!-- Items here require strong justification -->
