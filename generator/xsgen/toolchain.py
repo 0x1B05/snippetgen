@@ -57,6 +57,20 @@ def runtime_sources(repo_root: Path) -> list[Path]:
     ]
 
 
+def unique_plan_sources(plan: ComposePlan) -> list[Path]:
+    seen: set[Path] = set()
+    ordered: list[Path] = []
+
+    for snippet in plan.snippets:
+        for source_path in snippet.sources:
+            if source_path in seen:
+                continue
+            seen.add(source_path)
+            ordered.append(source_path)
+
+    return ordered
+
+
 def build_artifacts(
     repo_root: Path,
     plan: ComposePlan,
@@ -113,29 +127,28 @@ def build_artifacts(
         object_paths.append(str(object_path))
 
     source_index = len(object_paths) + 1
-    for snippet in plan.snippets:
-        for source_path in snippet.sources:
-            object_path = object_dir / f"{source_index:02d}_{source_path.stem}.o"
-            compile_cmd = [
-                toolchain["gcc"],
-                *compile_flags,
-                *include_flags,
-                "-c",
-                str(source_path),
-                "-o",
-                str(object_path),
-            ]
-            compile_result = subprocess.run(
-                compile_cmd,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            compile_commands.append(compile_cmd)
-            if compile_result.returncode != 0:
-                raise RuntimeError(compile_result.stderr or "RISC-V compile failed")
-            object_paths.append(str(object_path))
-            source_index += 1
+    for source_path in unique_plan_sources(plan):
+        object_path = object_dir / f"{source_index:02d}_{source_path.stem}.o"
+        compile_cmd = [
+            toolchain["gcc"],
+            *compile_flags,
+            *include_flags,
+            "-c",
+            str(source_path),
+            "-o",
+            str(object_path),
+        ]
+        compile_result = subprocess.run(
+            compile_cmd,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        compile_commands.append(compile_cmd)
+        if compile_result.returncode != 0:
+            raise RuntimeError(compile_result.stderr or "RISC-V compile failed")
+        object_paths.append(str(object_path))
+        source_index += 1
 
     generated_object = object_dir / f"{source_index:02d}_{artifact.generated_suite_path.stem}.o"
     generated_compile_cmd = [

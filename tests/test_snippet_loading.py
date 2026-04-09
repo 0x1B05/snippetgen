@@ -13,6 +13,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 ROUND2_FILES = [
+    "requirements.txt",
     "generator/cli.py",
     "generator/xsgen/model.py",
     "generator/xsgen/snippet_db.py",
@@ -126,6 +127,30 @@ class SnippetLoadingTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "not implemented in ELF-first PoC"):
                 snippet_db.load_manifest(stream_manifest, tmp_root)
+
+    def test_manifest_loader_rejects_unsupported_lang(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            source_path = tmp_root / "demo.c"
+            source_path.write_text("int demo(void) { return 0; }\n")
+
+            bad_lang_manifest = tmp_root / "bad_lang.yaml"
+            bad_lang_manifest.write_text(
+                textwrap.dedent(
+                    """
+                    id: demo
+                    kind: proc
+                    lang: rust
+                    sources:
+                      - demo.c
+                    """
+                ).strip()
+            )
+
+            with self.assertRaisesRegex(ValueError, "unsupported snippet language"):
+                snippet_db.load_manifest(bad_lang_manifest, tmp_root)
 
     def test_manifest_loader_rejects_invalid_snippet_id(self) -> None:
         snippet_db = importlib.import_module("generator.xsgen.snippet_db")
@@ -270,6 +295,10 @@ class SnippetLoadingTest(unittest.TestCase):
         self.assertTrue(plan["artifacts"]["elf"].endswith("build/scalar_load_legality_poc/test.elf"))
         self.assertTrue(plan["artifacts"]["bin"].endswith("build/scalar_load_legality_poc/test.bin"))
         self.assertTrue(plan["artifacts"]["build_manifest"].endswith("build/scalar_load_legality_poc/build_manifest.json"))
+
+    def test_declared_python_dependency(self) -> None:
+        requirements = (ROOT / "requirements.txt").read_text()
+        self.assertIn("PyYAML", requirements)
 
     def test_cli_build_generates_real_artifacts(self) -> None:
         result = subprocess.run(

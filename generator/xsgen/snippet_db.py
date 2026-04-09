@@ -10,6 +10,7 @@ from generator.xsgen.model import SnippetSpec
 
 REQUIRED_FIELDS = ("id", "kind", "lang", "sources")
 SNIPPET_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+SUPPORTED_LANGS = {"c", "asm"}
 
 
 def _require_mapping(data: object, path: Path) -> dict:
@@ -38,6 +39,8 @@ def load_manifest(path: Path, repo_root: Path) -> SnippetSpec:
         raise ValueError(f"{path} kind '{kind}' not implemented in ELF-first PoC")
     if not isinstance(lang, str) or not lang:
         raise ValueError(f"{path} field 'lang' must be a non-empty string")
+    if lang not in SUPPORTED_LANGS:
+        raise ValueError(f"{path} unsupported snippet language: {lang}")
     if not isinstance(raw_sources, list) or not raw_sources:
         raise ValueError(f"{path} field 'sources' must be a non-empty list")
 
