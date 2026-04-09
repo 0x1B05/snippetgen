@@ -9,6 +9,10 @@ def descriptor_symbol(snippet_id: str) -> str:
     return f"snippet_{snippet_id}"
 
 
+def format_seed_literal(seed: int) -> str:
+    return f"0x{seed:x}ull"
+
+
 def emit_harness(plan: ComposePlan, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -31,6 +35,7 @@ def emit_harness(plan: ComposePlan, output_path: Path) -> Path:
             "  int rc;",
             "",
             "  xsrt_init(&env);",
+            f"  env.seed = {format_seed_literal(plan.seed)};",
             "",
         ]
     )

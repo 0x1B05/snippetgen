@@ -45,6 +45,7 @@ class BuildPipelineTest(unittest.TestCase):
             current_index = harness.index(symbol)
             self.assertGreater(current_index, last_index)
             last_index = current_index
+        self.assertIn("env.seed = 0x1234ull;", harness)
 
     def test_suite_reorder_changes_generated_harness_order(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")
@@ -80,6 +81,38 @@ class BuildPipelineTest(unittest.TestCase):
             init_idx = harness.index("snippet_init_basic_env")
             self.assertLess(finish_idx, unaligned_idx)
             self.assertLess(unaligned_idx, init_idx)
+
+    def test_emitter_propagates_non_default_suite_seed(self) -> None:
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_suite = Path(tmpdir) / "seeded.yaml"
+            tmp_suite.write_text(
+                textwrap.dedent(
+                    """
+                    suite: seeded
+                    target: xiangshan-verilator
+                    seed: 99
+                    compose:
+                      mode: sequence
+                      snippets:
+                        - init_basic_env
+                    """
+                ).strip()
+            )
+            suite = suite_loader.load_suite(tmp_suite)
+            plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+            artifact = toolchain.artifact_paths_for_suite(Path(tmpdir), suite.name)
+            emitter.emit_harness(plan, artifact.generated_suite_path)
+            harness = artifact.generated_suite_path.read_text()
+
+            self.assertIn("xsrt_init(&env);", harness)
+            self.assertIn("env.seed = 0x63ull;", harness)
+            self.assertLess(harness.index("xsrt_init(&env);"), harness.index("env.seed = 0x63ull;"))
+            self.assertLess(harness.index("env.seed = 0x63ull;"), harness.index("xsrt_run_snippet(&env, &snippet_init_basic_env);"))
 
     def test_build_generates_artifacts_and_manifest(self) -> None:
         result = subprocess.run(
@@ -165,6 +198,44 @@ class BuildPipelineTest(unittest.TestCase):
 
             with self.assertRaisesRegex(RuntimeError, "undefined reference|unresolved"):
                 toolchain.build_artifacts(ROOT, plan, artifact)
+
+    def test_duplicate_snippet_reference_builds_once_per_source(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            suite_path = Path(tmpdir) / "duplicate.yaml"
+            suite_path.write_text(
+                textwrap.dedent(
+                    """
+                    suite: duplicate_snippet_suite
+                    target: xiangshan-verilator
+                    seed: 5
+                    compose:
+                      mode: sequence
+                      snippets:
+                        - arm_timer
+                        - arm_timer
+                        - finish_check
+                    """
+                ).strip()
+            )
+            suite = suite_loader.load_suite(suite_path)
+            plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+            artifact = toolchain.artifact_paths_for_suite(ROOT, plan.suite_name)
+            emitter.emit_harness(plan, artifact.generated_suite_path)
+            toolchain.build_artifacts(ROOT, plan, artifact)
+
+            harness = artifact.generated_suite_path.read_text()
+            self.assertEqual(2, harness.count("xsrt_run_snippet(&env, &snippet_arm_timer);"))
+            manifest = json.loads(artifact.build_manifest_path.read_text())
+            compile_sources = [
+                cmd[cmd.index("-c") + 1]
+                for cmd in manifest["commands"]["compile"]
+            ]
+            self.assertEqual(1, compile_sources.count(str((ROOT / "snippets" / "scalar_load_legality" / "arm_timer.c").resolve())))
 
     def test_missing_compile_input_causes_build_failure(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")

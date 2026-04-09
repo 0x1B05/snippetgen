@@ -31,7 +31,7 @@ RULES:
 ## MUTABLE SECTION
 <!-- Update each round with justification for changes -->
 
-### Plan Version: 12 (Updated: Round 4 Complete)
+### Plan Version: 15 (Updated: Round 5 Review)
 
 #### Plan Evolution Log
 <!-- Document any changes to the plan with justification -->
@@ -50,25 +50,28 @@ RULES:
 | 3-review | Codex verified the loader contract and emitter, but kept `task9` through `task12` open because the default `generator/cli.py build` entrypoint still crashes without an explicit suite path, `build_manifest.json` still omits distinct link-command provenance, and failed rebuilds leave stale success artifacts behind | Round 3 made real progress, but the reviewed build path still misses required task10/task11 contract points and can leave AC-4 in a false-green artifact state after failure | No scope change; the next round must finish the CLI default build path, manifest provenance, failure cleanup, and the missing contract tests before re-running `task12` |
 | 4 | Re-anchored Round 4 to only the three remaining build-path contract gaps from the Round 3 review | The latest review narrowed the remaining work to CLI defaulting, manifest link provenance, and stale-artifact cleanup, so the round should stay on that exact lane | No scope change; execution focus is the last AC-4/AC-2 contract cleanup before re-running task12 |
 | 4 | Closed the remaining build-path contract gaps and re-ran the required serial verification matrix before the fresh task12 analyze pass | The current tree now supports the default CLI build path, records compile/link/objcopy provenance, and cleans stale success artifacts on failure, so the final analyze pass can evaluate the post-fix state instead of the pre-fix gaps | No scope change; AC-1 and AC-4 now align with the first-stage contract, and only a non-blocking same-suite concurrent-build race remains queued |
+| 4-review | Rejected reopening AC-1 around `compose.ops` because the immutable implementation plan in `detail-plan.md` remains the goal-alignment authority for this loop, while the execution-prep doc is a secondary reference with a divergent suite-field example | The implementation, tests, and checked-in suite file already satisfy the accepted Round 4 contract under the current `compose.snippets` schema, so reopening `task7`, `task10`, `task11`, and `task12` would create tracker drift rather than close an original-plan gap | No scope change; Round 4 completion stands, the schema-name mismatch is tracked as a queued documentation issue, and the verified task records are restored |
+| 4-review | Pruned stale bootstrap-era queued issues whose revisit triggers had already fired during the end-to-end build/test rounds | The stronger contract tests and wired top-level build flow already superseded the old skeleton-verification and placeholder-target notes, so keeping them queued no longer reflected the real remaining risks | No scope change; the queue now contains only live non-blocking follow-up work |
+| 5 | Re-anchored Round 5 to the review-phase harness seed bug without widening scope beyond the accepted first-stage PoC contract | The latest review found that non-default suite seeds were recorded but not applied to runtime state, so the round needed a blocking fix in the emitter and a matching regression test | No scope change; this closes a fidelity gap in the existing AC-1/AC-2 path rather than adding new functionality |
+| 5 | Fixed harness seed propagation and revalidated the serial build path | The generated harness now copies `plan.seed` into `env.seed` before running snippets, so the built ELF matches the configured suite seed instead of silently falling back to `init_basic_env`'s default | No scope change; AC-1 and AC-2 remain intact and the queued follow-up list is unchanged |
 
 #### Active Tasks
 <!-- Mainline tasks only: each task must directly advance the current round objective and carry routing metadata -->
 | Task | Target AC | Status | Tag | Owner | Notes |
 |------|-----------|--------|-----|-------|-------|
-| None | - | - | - | - | Round 4 mainline work is complete after the post-fix verification and fresh task12 review |
+| None | - | - | - | - | Round 5 review fix is complete; no active blocking or mainline tasks remain |
 
 ### Blocking Side Issues
 <!-- Only issues that directly block current mainline progress belong here -->
 | Issue | Discovered Round | Blocking AC | Resolution Path |
 |-------|-----------------|-------------|-----------------|
-| None | - | - | No blocking side issues remain after the Round 4 CLI/toolchain fixes and serial verification evidence |
+| None | - | - | No blocking side issues remain after the Round 5 harness-seed fix |
 
 ### Queued Side Issues
 <!-- Non-blocking issues stay queued and must NOT replace the round objective -->
 | Issue | Discovered Round | Why Not Blocking | Revisit Trigger |
 |-------|-----------------|------------------|-----------------|
-| Strengthen the task1 skeleton verification beyond directory checks | 0 | It does not block the Round 1 runtime and snippet ABI baseline, but it must be folded into later contract-level tests before claiming the full ELF-first chain | Revisit when expanding tests for generator/build artifacts |
-| Flesh out README and Makefile placeholders (`build`, `run`, `list-snippets`, `clean`) | 0 | Documentation and convenience targets do not block the runtime baseline | Revisit while wiring the host-side generator and top-level build flow |
+| The execution-prep doc still shows `compose.ops` while the accepted Round 4 implementation plan, checked-in suite file, and tests use `compose.snippets` | 4-review | The immutable goal and ACs come from `detail-plan.md`, which does not require changing the field name, so this is a documentation-consistency issue rather than a blocker for the completed first-stage PoC | Revisit if the plan/docs are being consolidated or the suite schema is intentionally renamed in a later scope expansion |
 | Concurrent builds of the same suite share `build/<suite>/obj` and can race each other during cleanup | 4 | The first-stage contract only requires a stable serial build path, and the required serial verification commands now pass | Revisit if the generator is asked to support parallel same-suite orchestration or background rebuilds |
 
 ### Completed and Verified
@@ -81,12 +84,12 @@ RULES:
 | AC-1, AC-3 | task4: Implement the 5 PoC snippets and their manifests | 2 | 2 | Codex re-ran `python3 -m unittest tests/test_snippet_loading.py`; the suite passed and the reviewed snippet sources plus manifests match the planned five-snippet PoC surface |
 | AC-1 | task5: Implement Python data models for `SnippetSpec`, `SuiteSpec`, `ComposePlan`, and `BuildArtifact` | 2 | 2 | Codex re-ran `python3 -m unittest tests/test_snippet_loading.py`; the suite passed and the reviewed loader path exercises the new model objects deterministically |
 | AC-1 | task6: Implement `snippet_db.py` to scan manifests, validate required fields, and resolve source file paths | 3 | 3-review | Codex re-ran `python3 -m unittest tests.test_snippet_loading`; the suite passed and the reviewed loader path now enforces exact `not implemented in ELF-first PoC` rejection text plus invalid snippet-id rejection before symbol generation |
-| AC-1 | task7: Implement `suite_loader.py` to load `scalar_load_legality_poc.yaml`, validate `sequence` mode, and produce a deterministic plan | 3 | 3-review | Codex re-ran `python3 -m unittest tests.test_snippet_loading` and `make dump-plan`; the reviewed loader now enforces `future-only` mode rejection, unsupported-target rejection, invalid suite-name rejection, and a deterministic real-suite plan |
-| AC-2 | task8: Implement `emitter.py` to generate `build/<suite>/generated_suite.c` from the ordered snippet list | 3 | 3-review | Codex re-ran `python3 -m unittest tests.test_build_pipeline`; the reviewed emitter generates `generated_suite.c` in suite order and changes output when the suite order changes |
+| AC-1 | task7: Implement `suite_loader.py` to load `scalar_load_legality_poc.yaml`, validate `sequence` mode, and produce a deterministic plan | 3 | 3-review | Codex re-ran `python3 -m unittest tests.test_snippet_loading` and `make dump-plan`; the reviewed loader enforces `future-only` mode rejection, unsupported-target rejection, invalid suite-name rejection, and a deterministic real-suite plan under the accepted Round 4 suite schema |
+| AC-2 | task8: Implement `emitter.py` to generate `build/<suite>/generated_suite.c` from the ordered snippet list | 3 | 5 | Codex re-ran `python3 -m unittest tests.test_build_pipeline`; the reviewed emitter generates `generated_suite.c` in suite order, propagates non-default suite seeds into `env.seed`, and changes output when the suite order changes |
 | AC-4 | task9: Implement `toolchain.py` to compile runtime/snippet/harness sources, link `test.elf`, and export `test.bin` | 4 | 4 | Codex re-ran `python3 -m unittest tests.test_build_pipeline`, `python3 generator/cli.py build`, `python3 generator/cli.py build suites/scalar_load_legality_poc.yaml`, and `make build`; the reviewed toolchain now records compile/link/objcopy provenance and removes stale outputs after forced rebuild failures |
-| AC-1, AC-4 | task10: Create `scalar_load_legality_poc.yaml` and verify the build path generates `test.elf`, `test.bin`, and `build_manifest.json` | 4 | 4 | Codex re-ran `python3 generator/cli.py build`, `python3 generator/cli.py build suites/scalar_load_legality_poc.yaml`, and `make dump-plan`; the default no-arg build path now resolves the planned suite and emits artifacts under `build/scalar_load_legality_poc/` |
-| AC-1, AC-2 | task11: Add unit tests for manifest loading, suite loading, and harness emission failure modes | 4 | 4 | Codex re-ran `python3 -m unittest tests.test_runtime_surface tests.test_snippet_loading tests.test_build_pipeline`; the suite passed and now covers the no-arg CLI build path, `commands.link` manifest provenance, and stale-artifact cleanup after link and objcopy failures |
-| AC-3, AC-4 | task12: Review produced artifacts and prune any accidental future-only dependencies | 4 | 4 | Codex re-reviewed the post-fix worktree after serial verification and found no remaining mainline gaps or blocking side issues relative to `detail-plan.md`; only the non-blocking same-suite concurrent-build race was left queued |
+| AC-1, AC-4 | task10: Create `scalar_load_legality_poc.yaml` and verify the build path generates `test.elf`, `test.bin`, and `build_manifest.json` | 4 | 4 | Codex re-ran `python3 generator/cli.py build`, `python3 generator/cli.py build suites/scalar_load_legality_poc.yaml`, and `make dump-plan`; the checked-in suite continues to resolve deterministically and emit artifacts under `build/scalar_load_legality_poc/` |
+| AC-1, AC-2 | task11: Add unit tests for manifest loading, suite loading, and harness emission failure modes | 4 | 5 | Codex re-ran `python3 -m unittest tests.test_runtime_surface tests.test_snippet_loading tests.test_build_pipeline`; the suite passed and now also covers non-default suite seed propagation in the emitted harness |
+| AC-3, AC-4 | task12: Review produced artifacts and prune any accidental future-only dependencies | 5 | pending | The Round 5 blocking fix is verified locally and the fresh review pass should confirm that no new future-only or mainline regressions were introduced by the emitter change |
 
 ### Explicitly Deferred
 <!-- Items here require strong justification -->
