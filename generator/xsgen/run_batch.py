@@ -13,6 +13,12 @@ from generator.xsgen.suite_loader import build_compose_plan, load_suite
 from generator.xsgen.toolchain import artifact_paths_for_run_seed, build_artifacts
 
 
+def _require_non_negative_seed(value: int) -> int:
+    if value < 0:
+        raise ValueError(f"seed must be non-negative: {value}")
+    return value
+
+
 def normalize_seeds(
     *,
     seed: int | None,
@@ -24,7 +30,7 @@ def normalize_seeds(
         raise ValueError("exactly one seed selector must be provided")
 
     if seed is not None:
-        return (seed,)
+        return (_require_non_negative_seed(seed),)
 
     if seeds is not None:
         parts = seeds.split(",")
@@ -39,6 +45,7 @@ def normalize_seeds(
                 value = int(part)
             except ValueError as exc:
                 raise ValueError(f"invalid seed value: {part}") from exc
+            _require_non_negative_seed(value)
             if value in seen:
                 raise ValueError(f"duplicate seed value: {value}")
             seen.add(value)
@@ -54,6 +61,8 @@ def normalize_seeds(
         end = int(bounds[1])
     except ValueError as exc:
         raise ValueError(f"invalid seed range: {seed_range}") from exc
+    _require_non_negative_seed(start)
+    _require_non_negative_seed(end)
     if end < start:
         raise ValueError(f"invalid seed range: {seed_range}")
     return tuple(range(start, end + 1))

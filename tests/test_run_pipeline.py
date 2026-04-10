@@ -31,12 +31,18 @@ class RunPipelineTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "one seed selector"):
             run_batch.normalize_seeds(seed=None, seeds=None, seed_range=None)
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            run_batch.normalize_seeds(seed=-1, seeds=None, seed_range=None)
         with self.assertRaisesRegex(ValueError, "duplicate"):
             run_batch.normalize_seeds(seed=None, seeds="1,2,2", seed_range=None)
         with self.assertRaisesRegex(ValueError, "invalid seed"):
             run_batch.normalize_seeds(seed=None, seeds="1,,3", seed_range=None)
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            run_batch.normalize_seeds(seed=None, seeds="-1,2", seed_range=None)
         with self.assertRaisesRegex(ValueError, "invalid seed range"):
             run_batch.normalize_seeds(seed=None, seeds=None, seed_range="3:0")
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            run_batch.normalize_seeds(seed=None, seeds=None, seed_range="-1:1")
 
     def test_default_run_batch_ids_are_unique(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
@@ -77,6 +83,18 @@ class RunPipelineTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as ctx:
             cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seeds", "1,,3"])
         self.assertEqual("invalid seed list contains an empty seed", str(ctx.exception))
+
+    def test_cli_run_rejects_negative_seed_without_emitting_ledger(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                with self.assertRaises(SystemExit) as ctx:
+                    cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "-1"])
+
+        self.assertIn("non-negative", str(ctx.exception))
+        run_mock.assert_not_called()
 
     def test_run_batch_writes_seed_isolated_artifacts_and_ledger(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
