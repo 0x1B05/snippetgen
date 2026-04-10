@@ -15,6 +15,7 @@ static int vsetvl_interrupt_path_run(xsrt_env_t *env) {
   iterations = 8u + (unsigned long) (env->seed & 0xfu);
 
   for (unsigned long index = 0; index < iterations; ++index) {
+#if defined(__riscv)
     __asm__ volatile(
         ".option push\n"
         ".option arch, +v\n"
@@ -23,6 +24,9 @@ static int vsetvl_interrupt_path_run(xsrt_env_t *env) {
         :
         :
         : "memory");
+#else
+    __asm__ volatile("" ::: "memory");
+#endif
   }
 
   env->snippet_id = XS_VSETVL_SNIPPET_MAGIC;

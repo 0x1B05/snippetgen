@@ -58,6 +58,8 @@ class SnippetLoadingTest(unittest.TestCase):
             "snippets/scalar_load_legality/arm_timer.c",
             "snippets/scalar_load_legality/unaligned_load.c",
             "snippets/scalar_load_legality/check_scalar_load_legality.c",
+            "snippets/vector_interrupt/vsetvl_interrupt_path.c",
+            "snippets/vector_interrupt/check_vsetvl_interrupt_path.c",
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
