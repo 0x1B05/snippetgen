@@ -1,0 +1,11 @@
+suite: vsetvl_interrupt_path_poc
+target: xiangshan-verilator
+seed: 4660
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - arm_timer
+    - vsetvl_interrupt_path
+    - check_vsetvl_interrupt_path
+    - finish_check

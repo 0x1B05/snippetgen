@@ -18,8 +18,11 @@ if str(ROOT) not in sys.path:
 class BuildPipelineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.build_dir = ROOT / "build" / "scalar_load_legality_poc"
+        self.vsetvl_build_dir = ROOT / "build" / "vsetvl_interrupt_path_poc"
         if self.build_dir.exists():
             shutil.rmtree(self.build_dir)
+        if self.vsetvl_build_dir.exists():
+            shutil.rmtree(self.vsetvl_build_dir)
 
     def test_emitter_generates_harness_in_suite_order(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")
@@ -147,6 +150,77 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertTrue(manifest["commands"]["compile"])
         self.assertTrue(manifest["commands"]["link"])
         self.assertTrue(manifest["commands"]["objcopy"])
+
+    def test_vsetvl_suite_build_generates_artifacts_and_manifest(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", "suites/vsetvl_interrupt_path_poc.yaml"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        generated_suite = self.vsetvl_build_dir / "generated_suite.c"
+        test_elf = self.vsetvl_build_dir / "test.elf"
+        test_bin = self.vsetvl_build_dir / "test.bin"
+        build_manifest = self.vsetvl_build_dir / "build_manifest.json"
+
+        self.assertTrue(generated_suite.is_file())
+        self.assertTrue(test_elf.is_file())
+        self.assertTrue(test_bin.is_file())
+        self.assertTrue(build_manifest.is_file())
+
+        manifest = json.loads(build_manifest.read_text())
+        self.assertEqual("vsetvl_interrupt_path_poc", manifest["suite"])
+        self.assertEqual(
+            ["init_basic_env", "arm_timer", "vsetvl_interrupt_path", "check_vsetvl_interrupt_path", "finish_check"],
+            manifest["snippet_ids"],
+        )
+        self.assertEqual(str(generated_suite), manifest["artifacts"]["generated_suite"])
+        self.assertEqual(str(test_elf), manifest["artifacts"]["elf"])
+        self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
+        self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
+        self.assertTrue(manifest["commands"]["compile"])
+        self.assertTrue(manifest["commands"]["link"])
+        self.assertTrue(manifest["commands"]["objcopy"])
+
+    def test_vsetvl_suite_harness_order_and_final_elf_contains_vsetvl(self) -> None:
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        suite = suite_loader.load_suite(ROOT / "suites/vsetvl_interrupt_path_poc.yaml")
+        plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+        artifact = toolchain.artifact_paths_for_suite(ROOT, suite.name)
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+
+        harness = artifact.generated_suite_path.read_text()
+        ordered_symbols = [
+            "snippet_init_basic_env",
+            "snippet_arm_timer",
+            "snippet_vsetvl_interrupt_path",
+            "snippet_check_vsetvl_interrupt_path",
+            "snippet_finish_check",
+        ]
+        last_index = -1
+        for symbol in ordered_symbols:
+            current_index = harness.index(symbol)
+            self.assertGreater(current_index, last_index)
+            last_index = current_index
+
+        toolchain.build_artifacts(ROOT, plan, artifact)
+        objdump = f'{toolchain.detect_toolchain()["prefix"]}-objdump'
+        disasm_result = subprocess.run(
+            [objdump, "-d", str(artifact.elf_path)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, disasm_result.returncode, msg=disasm_result.stderr)
+        self.assertIn("vsetvl", disasm_result.stdout)
 
     def test_cli_build_defaults_to_poc_suite(self) -> None:
         result = subprocess.run(

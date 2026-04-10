@@ -31,10 +31,23 @@ ROUND2_FILES = [
     "suites/scalar_load_legality_poc.yaml",
 ]
 
+VSETVL_PATH_FILES = [
+    "snippets/vector_interrupt/vsetvl_interrupt_path.c",
+    "snippets/vector_interrupt/check_vsetvl_interrupt_path.c",
+    "snippets/manifests/vsetvl_interrupt_path.yaml",
+    "snippets/manifests/check_vsetvl_interrupt_path.yaml",
+    "suites/vsetvl_interrupt_path_poc.yaml",
+]
+
 
 class SnippetLoadingTest(unittest.TestCase):
     def test_round2_files_exist(self) -> None:
         for relative_path in ROUND2_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_vsetvl_path_files_exist(self) -> None:
+        for relative_path in VSETVL_PATH_FILES:
             with self.subTest(path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_file())
 
@@ -87,6 +100,27 @@ class SnippetLoadingTest(unittest.TestCase):
 
         self.assertEqual(
             ("init_basic_env", "arm_timer", "unaligned_load", "check_scalar_load_legality", "finish_check"),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_vsetvl_path_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/vsetvl_interrupt_path_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "arm_timer",
+                "vsetvl_interrupt_path",
+                "check_vsetvl_interrupt_path",
+                "finish_check",
+            ),
             plan_first.snippet_ids,
         )
         self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)

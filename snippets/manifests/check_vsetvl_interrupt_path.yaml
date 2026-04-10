@@ -1,0 +1,5 @@
+id: check_vsetvl_interrupt_path
+kind: proc
+lang: c
+sources:
+  - snippets/vector_interrupt/check_vsetvl_interrupt_path.c
