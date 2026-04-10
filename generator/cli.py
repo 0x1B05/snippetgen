@@ -16,6 +16,7 @@ from generator.xsgen.snippet_db import load_snippet_db
 from generator.xsgen.suite_loader import build_compose_plan, load_suite
 from generator.xsgen.emitter import emit_harness
 from generator.xsgen.toolchain import artifact_paths_for_suite, build_artifacts
+from generator.xsgen.run_batch import normalize_seeds, run_suite_batch
 
 
 def cmd_list_snippets(_: argparse.Namespace) -> int:
@@ -59,8 +60,19 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_run(_: argparse.Namespace) -> int:
-    raise SystemExit("run not implemented yet: target execution lands in a later round")
+def cmd_run(args: argparse.Namespace) -> int:
+    try:
+        seed_values = normalize_seeds(seed=args.seed, seeds=args.seeds, seed_range=args.seed_range)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    ledger_path = run_suite_batch(
+        repo_root=REPO_ROOT,
+        suite_path=REPO_ROOT / Path(args.suite),
+        seed_values=seed_values,
+        timeout_s=args.timeout_sec,
+    )
+    print(ledger_path)
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -79,7 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
     build_parser_cmd.set_defaults(handler=cmd_build)
 
     run_parser = subparsers.add_parser("run")
-    run_parser.add_argument("artifact", nargs="?")
+    run_parser.add_argument("suite")
+    seed_group = run_parser.add_mutually_exclusive_group(required=True)
+    seed_group.add_argument("--seed", type=int)
+    seed_group.add_argument("--seeds")
+    seed_group.add_argument("--seed-range")
+    run_parser.add_argument("--timeout-sec", type=int)
     run_parser.set_defaults(handler=cmd_run)
 
     return parser

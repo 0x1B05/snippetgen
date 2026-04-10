@@ -9,8 +9,8 @@ import subprocess
 from generator.xsgen.model import BuildArtifact, ComposePlan
 
 
-def artifact_paths_for_suite(repo_root: Path, suite_name: str) -> BuildArtifact:
-    build_dir = (repo_root / "build" / suite_name).resolve()
+def _artifact_paths_for_build_dir(build_dir: Path, suite_name: str) -> BuildArtifact:
+    build_dir = build_dir.resolve()
     return BuildArtifact(
         suite_name=suite_name,
         build_dir=build_dir,
@@ -19,6 +19,20 @@ def artifact_paths_for_suite(repo_root: Path, suite_name: str) -> BuildArtifact:
         bin_path=build_dir / "test.bin",
         build_manifest_path=build_dir / "build_manifest.json",
     )
+
+
+def artifact_paths_for_suite(repo_root: Path, suite_name: str) -> BuildArtifact:
+    return _artifact_paths_for_build_dir(repo_root / "build" / suite_name, suite_name)
+
+
+def artifact_paths_for_run_seed(
+    repo_root: Path,
+    suite_name: str,
+    run_batch: str,
+    seed: int,
+) -> BuildArtifact:
+    build_dir = repo_root / "build" / suite_name / "runs" / run_batch / f"seed_{seed}"
+    return _artifact_paths_for_build_dir(build_dir, suite_name)
 
 
 def _find_tool(name: str) -> str | None:

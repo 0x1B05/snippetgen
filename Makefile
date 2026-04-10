@@ -4,7 +4,7 @@ build:
 	python3 generator/cli.py build suites/scalar_load_legality_poc.yaml
 
 run:
-	python3 generator/cli.py run build/scalar_load_legality_poc/test.elf
+	python3 generator/cli.py run suites/scalar_load_legality_poc.yaml --seed 4660
 
 list-snippets:
 	python3 generator/cli.py list-snippets

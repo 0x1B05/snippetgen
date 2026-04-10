@@ -38,3 +38,49 @@ class BuildArtifact:
     elf_path: Path | None = None
     bin_path: Path | None = None
     build_manifest_path: Path | None = None
+
+
+@dataclass(frozen=True)
+class RunSeedArtifacts:
+    suite_name: str
+    target: str
+    seed: int
+    run_batch: str
+    build_artifact: BuildArtifact
+    stdout_log_path: Path
+    stderr_log_path: Path
+    run_meta_path: Path
+
+
+@dataclass(frozen=True)
+class TargetRunResult:
+    status: str
+    labels: tuple[str, ...]
+    notes: str
+    returncode: int | None = None
+
+
+@dataclass(frozen=True)
+class RunEntry:
+    suite_name: str
+    target: str
+    run_batch: str
+    seed: int
+    artifact_dir: Path
+    elf_path: Path
+    bin_path: Path
+    stdout_log_path: Path
+    stderr_log_path: Path
+    run_meta_path: Path
+    status: str
+    labels: tuple[str, ...]
+    notes: str
+    returncode: int | None = None
+
+
+@dataclass(frozen=True)
+class RunLedger:
+    suite_name: str
+    target: str
+    run_batch: str
+    entries: tuple[RunEntry, ...]
