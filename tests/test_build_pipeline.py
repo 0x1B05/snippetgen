@@ -211,7 +211,7 @@ class BuildPipelineTest(unittest.TestCase):
             last_index = current_index
 
         toolchain.build_artifacts(ROOT, plan, artifact)
-        objdump = f'{toolchain.detect_toolchain()["prefix"]}-objdump'
+        objdump = toolchain.resolve_objdump(toolchain.detect_toolchain())
         disasm_result = subprocess.run(
             [objdump, "-d", "--disassemble=vsetvl_interrupt_path_run", str(artifact.elf_path)],
             cwd=ROOT,
@@ -259,6 +259,29 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertEqual(first.elf_path, second.elf_path)
         self.assertEqual(first.bin_path, second.bin_path)
         self.assertEqual(first.build_manifest_path, second.build_manifest_path)
+
+    def test_objdump_resolves_from_detected_toolchain_directory(self) -> None:
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tool_dir = Path(tmpdir)
+            gcc_path = tool_dir / "riscv64-custom-gcc"
+            objcopy_path = tool_dir / "riscv64-custom-objcopy"
+            objdump_path = tool_dir / "riscv64-custom-objdump"
+
+            for path in (gcc_path, objcopy_path, objdump_path):
+                path.write_text("#!/bin/sh\nexit 0\n")
+                path.chmod(0o755)
+
+            resolved = toolchain.resolve_objdump(
+                {
+                    "prefix": "riscv64-custom",
+                    "gcc": str(gcc_path),
+                    "objcopy": str(objcopy_path),
+                }
+            )
+
+            self.assertEqual(str(objdump_path), resolved)
 
     def test_missing_descriptor_causes_build_failure(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")

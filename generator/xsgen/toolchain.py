@@ -44,6 +44,24 @@ def detect_toolchain() -> dict[str, str]:
     raise RuntimeError("RISC-V cross toolchain not found")
 
 
+def resolve_objdump(toolchain: dict[str, str]) -> str:
+    if "objdump" in toolchain and toolchain["objdump"]:
+        return toolchain["objdump"]
+
+    objdump_name = f'{toolchain["prefix"]}-objdump'
+
+    for anchor in ("gcc", "objcopy"):
+        candidate = Path(toolchain[anchor]).with_name(objdump_name)
+        if candidate.is_file():
+            return str(candidate)
+
+    found = _find_tool(objdump_name)
+    if found is not None:
+        return found
+
+    raise RuntimeError(f"RISC-V objdump not found: {objdump_name}")
+
+
 def runtime_sources(repo_root: Path) -> list[Path]:
     return [
         repo_root / "runtime" / "arch" / "riscv64" / "start.S",
