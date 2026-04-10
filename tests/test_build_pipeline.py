@@ -213,14 +213,29 @@ class BuildPipelineTest(unittest.TestCase):
         toolchain.build_artifacts(ROOT, plan, artifact)
         objdump = f'{toolchain.detect_toolchain()["prefix"]}-objdump'
         disasm_result = subprocess.run(
-            [objdump, "-d", str(artifact.elf_path)],
+            [objdump, "-d", "--disassemble=vsetvl_interrupt_path_run", str(artifact.elf_path)],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
         self.assertEqual(0, disasm_result.returncode, msg=disasm_result.stderr)
-        self.assertIn("vsetvl", disasm_result.stdout)
+        instructions = []
+        for line in disasm_result.stdout.splitlines():
+            fields = line.split("\t")
+            if len(fields) < 3:
+                continue
+            instructions.append("\t".join(field.strip() for field in fields[2:] if field.strip()))
+
+        enable_index = next(
+            index for index, instruction in enumerate(instructions)
+            if instruction.startswith("csrs\tmstatus,")
+        )
+        vsetvl_index = next(
+            index for index, instruction in enumerate(instructions)
+            if instruction == "vsetvl\tzero,zero,zero"
+        )
+        self.assertLess(enable_index, vsetvl_index)
 
     def test_cli_build_defaults_to_poc_suite(self) -> None:
         result = subprocess.run(

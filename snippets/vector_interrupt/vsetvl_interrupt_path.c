@@ -14,6 +14,13 @@ static int vsetvl_interrupt_path_run(xsrt_env_t *env) {
   env->flags |= (uint64_t) XS_VSETVL_FLAG_ENTERED;
   iterations = 8u + (unsigned long) (env->seed & 0xfu);
 
+#if defined(__riscv)
+  {
+    const unsigned long vs_mask = XS_VSETVL_MSTATUS_VS_MASK;
+    __asm__ volatile("csrs mstatus, %0" : : "r"(vs_mask) : "memory");
+  }
+#endif
+
   for (unsigned long index = 0; index < iterations; ++index) {
 #if defined(__riscv)
     __asm__ volatile(
