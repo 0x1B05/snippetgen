@@ -23,36 +23,34 @@ def _emu_path() -> Path | None:
     return Path(found)
 
 
+def _error_result(*, artifacts, notes: str, labels: tuple[str, ...] = ("error",)) -> TargetRunResult:
+    artifacts.stderr_log_path.write_text(f"{notes}\n")
+    artifacts.stdout_log_path.write_text("")
+    return TargetRunResult(
+        status="error",
+        labels=labels,
+        notes=notes,
+        returncode=None,
+    )
+
+
 def run_target(*, artifacts, timeout_s: int | None) -> TargetRunResult:
     emu_path = _emu_path()
     if artifacts.build_artifact.bin_path is None or not artifacts.build_artifact.bin_path.is_file():
-        artifacts.stderr_log_path.write_text("missing bin artifact\n")
-        artifacts.stdout_log_path.write_text("")
-        return TargetRunResult(
-            status="error",
-            labels=("error",),
-            notes="missing bin artifact",
-            returncode=None,
-        )
+        return _error_result(artifacts=artifacts, notes="missing bin artifact")
 
     if emu_path is None:
-        artifacts.stderr_log_path.write_text("runner missing: emu\n")
-        artifacts.stdout_log_path.write_text("")
-        return TargetRunResult(
-            status="error",
-            labels=("error", "runner_missing"),
+        return _error_result(
+            artifacts=artifacts,
             notes="runner missing: emu",
-            returncode=None,
+            labels=("error", "runner_missing"),
         )
 
     if not emu_path.is_file():
-        artifacts.stderr_log_path.write_text(f"runner missing: {emu_path}\n")
-        artifacts.stdout_log_path.write_text("")
-        return TargetRunResult(
-            status="error",
-            labels=("error", "runner_missing"),
+        return _error_result(
+            artifacts=artifacts,
             notes=f"runner missing: {emu_path}",
-            returncode=None,
+            labels=("error", "runner_missing"),
         )
 
     timeout_value = timeout_s if timeout_s is not None else DEFAULT_TIMEOUT_SEC
