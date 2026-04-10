@@ -2,21 +2,25 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import shutil
 import subprocess
 
 from generator.xsgen.model import TargetRunResult
 
 
-DEFAULT_EMU_PATH = Path("/home/dfpmts/XS/xs-env/XiangShan/build/emu")
 DEFAULT_MAX_INSTR = 20000
 DEFAULT_TIMEOUT_SEC = 15
 
 
-def _emu_path() -> Path:
+def _emu_path() -> Path | None:
     override = os.environ.get("SNIPPETGEN_XS_EMU")
     if override:
         return Path(override)
-    return DEFAULT_EMU_PATH
+
+    found = shutil.which("emu")
+    if found is None:
+        return None
+    return Path(found)
 
 
 def run_target(*, artifacts, timeout_s: int | None) -> TargetRunResult:
@@ -28,6 +32,16 @@ def run_target(*, artifacts, timeout_s: int | None) -> TargetRunResult:
             status="error",
             labels=("error",),
             notes="missing bin artifact",
+            returncode=None,
+        )
+
+    if emu_path is None:
+        artifacts.stderr_log_path.write_text("runner missing: emu\n")
+        artifacts.stdout_log_path.write_text("")
+        return TargetRunResult(
+            status="error",
+            labels=("error", "runner_missing"),
+            notes="runner missing: emu",
             returncode=None,
         )
 

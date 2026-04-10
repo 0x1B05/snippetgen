@@ -1,5 +1,6 @@
 from pathlib import Path
 import importlib
+import importlib.util
 import json
 import shutil
 import sys
@@ -55,8 +56,20 @@ class RunPipelineTest(unittest.TestCase):
     def test_cli_run_invokes_batch_with_normalized_seeds(self) -> None:
         cli = importlib.import_module("generator.cli")
 
-        with mock.patch.object(cli, "run_suite_batch", return_value=Path("/tmp/run-ledger.json")) as run_mock:
-            rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seeds", "4,5,6"])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [{"seed": 4, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seeds", "4,5,6"])
 
         self.assertEqual(0, rc)
         run_mock.assert_called_once()
@@ -67,13 +80,37 @@ class RunPipelineTest(unittest.TestCase):
     def test_cli_run_invokes_batch_with_single_seed_and_range(self) -> None:
         cli = importlib.import_module("generator.cli")
 
-        with mock.patch.object(cli, "run_suite_batch", return_value=Path("/tmp/run-ledger.json")) as run_mock:
-            rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7"])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [{"seed": 7, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7"])
         self.assertEqual(0, rc)
         self.assertEqual((7,), run_mock.call_args.kwargs["seed_values"])
 
-        with mock.patch.object(cli, "run_suite_batch", return_value=Path("/tmp/run-ledger.json")) as run_mock:
-            rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed-range", "8:10"])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [{"seed": 8, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed-range", "8:10"])
         self.assertEqual(0, rc)
         self.assertEqual((8, 9, 10), run_mock.call_args.kwargs["seed_values"])
 
@@ -95,6 +132,76 @@ class RunPipelineTest(unittest.TestCase):
 
         self.assertIn("non-negative", str(ctx.exception))
         run_mock.assert_not_called()
+
+    def test_cli_run_returns_nonzero_when_batch_has_failure_entries(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [
+                            {
+                                "seed": 1,
+                                "status": "error",
+                                "labels": ["error"],
+                            }
+                        ],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path):
+                rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7"])
+
+        self.assertNotEqual(0, rc)
+
+    def test_cli_run_returns_zero_when_all_batch_entries_succeed(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [
+                            {
+                                "seed": 1,
+                                "status": "ran",
+                                "labels": ["built", "ran"],
+                            }
+                        ],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path):
+                rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7"])
+
+        self.assertEqual(0, rc)
+
+    def test_xiangshan_runner_resolves_from_env_or_path_only(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tool_dir = Path(tmpdir)
+            emu_path = tool_dir / "emu"
+            emu_path.write_text("#!/bin/sh\nexit 0\n")
+            emu_path.chmod(0o755)
+
+            with mock.patch.dict(module.os.environ, {"PATH": str(tool_dir)}, clear=False):
+                resolved = module._emu_path()
+
+        self.assertEqual(emu_path, resolved)
 
     def test_run_batch_writes_seed_isolated_artifacts_and_ledger(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")

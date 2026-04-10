@@ -19,6 +19,18 @@ from generator.xsgen.toolchain import artifact_paths_for_suite, build_artifacts
 from generator.xsgen.run_batch import normalize_seeds, run_suite_batch
 
 
+def _run_exit_code(ledger_path: Path) -> int:
+    payload = json.loads(ledger_path.read_text())
+    entries = payload.get("entries", [])
+    if not entries:
+        return 1
+    success_statuses = {"ran"}
+    for entry in entries:
+        if entry.get("status") not in success_statuses:
+            return 1
+    return 0
+
+
 def cmd_list_snippets(_: argparse.Namespace) -> int:
     snippet_db = load_snippet_db(REPO_ROOT)
     for snippet_id in sorted(snippet_db):
@@ -72,7 +84,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         timeout_s=args.timeout_sec,
     )
     print(ledger_path)
-    return 0
+    return _run_exit_code(ledger_path)
 
 
 def build_parser() -> argparse.ArgumentParser:
