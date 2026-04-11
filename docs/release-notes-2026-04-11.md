@@ -1,0 +1,103 @@
+# Release Notes 2026-04-11
+
+This snapshot turns `snippetgen-demo` from a build-only PoC into a repository that can:
+
+- generate deterministic baremetal workloads
+- build `ELF/bin/disasm`
+- run workloads on XiangShan `emu`
+- keep machine-readable run ledgers
+- hold path-oriented suites and bug-hunting suites in one place
+
+## Highlights
+
+### 1. Multi-seed run pipeline
+
+The repository now supports:
+
+- `python3 generator/cli.py run ... --seed <N>`
+- `python3 generator/cli.py run ... --seeds <A,B,C>`
+- `python3 generator/cli.py run ... --seed-range <L:R>`
+
+Run artifacts are isolated per seed under:
+
+```text
+build/<suite>/runs/seed_<N>/
+```
+
+and summarized by:
+
+```text
+build/<suite>/runs/run_ledger.json
+```
+
+### 2. Real XiangShan `emu` integration
+
+The run adapter now targets the real XiangShan environment:
+
+- XiangShan `emu`
+- NEMU diff reference
+- structured `stdout.log` / `stderr.log`
+- weak result labels such as `good_trap`, `abort`, `timeout`, and `limit_exceeded`
+
+### 3. `disasm` is now a first-class artifact
+
+Every build emits:
+
+- `test.elf`
+- `test.bin`
+- `disasm`
+
+This makes it easier for humans and agents to confirm that the final ELF really contains the intended instruction sequence.
+
+### 4. New suites
+
+The repository now includes:
+
+- `scalar_load_legality_poc`
+- `vsetvl_interrupt_path_poc`
+- `interrupt_response_poc`
+- `vsetvl_interrupt_search_poc`
+- `misaligned_split_store_search_poc`
+
+### 5. Reproducible pre-fix misaligned split-store abort
+
+On a pre-fix XiangShan tree, the current `misaligned_split_store_search_poc` can reproduce an `abort` path via the repository `run` command.
+
+Reference command:
+
+```bash
+source /home/dfpmts/XS/xs-env/env.sh
+SNIPPETGEN_RUN_MAX_CYCLES=12000 SNIPPETGEN_RUN_MAX_INSTR=12000 \
+python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --seed 0 --timeout-sec 140
+```
+
+Expected result:
+
+- `run_ledger.json` records `status: "abort"`
+- `stdout.log` contains difftest mismatch and `ABORT`
+
+## Documentation Layout
+
+### Main entry points
+
+- [`README.md`](/home/dfpmts/XS/framework/snippetgen-demo/README.md)
+- [`docs/2026-04-10-xiangshan-emu-workload-howto.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-xiangshan-emu-workload-howto.md)
+
+### Investigation notes
+
+- [`docs/2026-04-10-vsetvl-hang-investigation-notes.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-vsetvl-hang-investigation-notes.md)
+
+### Archived planning material
+
+- [`docs/archive/README.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/archive/README.md)
+
+## External Coupling
+
+This repository does not vendor the external XiangShan tree.
+
+If you want LightSSS wave dump on abort:
+
+- the external `emu` must be built with trace support
+- the external XiangShan `emu.cpp` must keep the local abort-wave patch
+
+The repository-side run adapter already passes `wave_path`; whether a wave file actually appears depends on that external build.
