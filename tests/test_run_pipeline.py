@@ -3,6 +3,7 @@ import importlib
 import importlib.util
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -45,13 +46,10 @@ class RunPipelineTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "non-negative"):
             run_batch.normalize_seeds(seed=None, seeds=None, seed_range="-1:1")
 
-    def test_default_run_batch_ids_are_unique(self) -> None:
+    def test_default_run_batch_id_is_stable(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
 
-        first = run_batch._default_run_batch_id()
-        second = run_batch._default_run_batch_id()
-
-        self.assertNotEqual(first, second)
+        self.assertEqual("stable", run_batch._default_run_batch_id())
 
     def test_cli_run_invokes_batch_with_normalized_seeds(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -185,7 +183,7 @@ class RunPipelineTest(unittest.TestCase):
 
         self.assertEqual(0, rc)
 
-    def test_xiangshan_runner_resolves_from_env_or_path_only(self) -> None:
+    def test_xiangshan_runner_falls_back_to_path_when_xs_env_is_absent(self) -> None:
         module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
         spec = importlib.util.spec_from_file_location("xiangshan_run_target_test", module_path)
         module = importlib.util.module_from_spec(spec)
@@ -198,10 +196,310 @@ class RunPipelineTest(unittest.TestCase):
             emu_path.write_text("#!/bin/sh\nexit 0\n")
             emu_path.chmod(0o755)
 
-            with mock.patch.dict(module.os.environ, {"PATH": str(tool_dir)}, clear=False):
-                resolved = module._emu_path()
+            with mock.patch.dict(
+                module.os.environ,
+                {
+                    "PATH": str(tool_dir),
+                    "SNIPPETGEN_XS_ENV_SH": str(tool_dir / "missing-env.sh"),
+                },
+                clear=False,
+            ):
+                resolved = module._emu_path(module._xs_env())
 
         self.assertEqual(emu_path, resolved)
+
+    def test_xiangshan_runner_uses_xs_env_paths_and_diff_reference(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_real_env_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        model = importlib.import_module("generator.xsgen.model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            xs_env_root = root / "xs-env"
+            env_sh = xs_env_root / "env.sh"
+            emu_path = xs_env_root / "XiangShan" / "build" / "verilator-compile" / "emu"
+            diff_path = xs_env_root / "NEMU" / "build" / "riscv64-nemu-interpreter-so"
+            build_dir = root / "build"
+            bin_path = build_dir / "test.bin"
+            elf_path = build_dir / "test.elf"
+            stdout_log_path = build_dir / "stdout.log"
+            stderr_log_path = build_dir / "stderr.log"
+            run_meta_path = build_dir / "run_meta.json"
+
+            emu_path.parent.mkdir(parents=True, exist_ok=True)
+            diff_path.parent.mkdir(parents=True, exist_ok=True)
+            build_dir.mkdir(parents=True, exist_ok=True)
+
+            env_sh.write_text("#!/bin/sh\n")
+            emu_path.write_text("#!/bin/sh\nexit 0\n")
+            emu_path.chmod(0o755)
+            diff_path.write_text("stub diff\n")
+            bin_path.write_bytes(b"\x00")
+            elf_path.write_bytes(b"\x00")
+            stdout_log_path.write_text("")
+            stderr_log_path.write_text("")
+
+            artifacts = model.RunSeedArtifacts(
+                suite_name="demo",
+                target="xiangshan-verilator",
+                seed=4660,
+                run_batch="batch",
+                build_artifact=model.BuildArtifact(
+                    suite_name="demo",
+                    build_dir=build_dir,
+                    generated_suite_path=build_dir / "generated_suite.c",
+                    elf_path=elf_path,
+                    bin_path=bin_path,
+                    build_manifest_path=build_dir / "build_manifest.json",
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+                wave_path=build_dir / "lightsss-wave",
+            )
+
+            captured: dict[str, object] = {}
+
+            def fake_run(command, **kwargs):
+                captured["command"] = command
+                captured["env"] = kwargs["env"]
+                kwargs["stdout"].write("HIT GOOD TRAP\n")
+                kwargs["stdout"].flush()
+                return subprocess.CompletedProcess(command, 0)
+
+            with mock.patch.dict(
+                module.os.environ,
+                {"SNIPPETGEN_XS_ENV_SH": str(env_sh)},
+                clear=False,
+            ):
+                with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                    result = module.run_target(artifacts=artifacts, timeout_s=5)
+
+        self.assertEqual("ran", result.status)
+        self.assertIn("ran", result.labels)
+        command = captured["command"]
+        self.assertEqual(str(emu_path), command[0])
+        self.assertIn("--diff", command)
+        self.assertIn(str(diff_path), command)
+        self.assertNotIn("--no-diff", command)
+        self.assertIn("--enable-fork", command)
+        self.assertIn("-X", command)
+        self.assertIn("1", command)
+        self.assertIn("--wave-path", command)
+        self.assertIn(str(build_dir / "lightsss-wave"), command)
+        self.assertNotIn("--dump-wave", command)
+
+    def test_xiangshan_runner_classifies_limit_exceeded_from_logs(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_limit_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        model = importlib.import_module("generator.xsgen.model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            xs_env_root = root / "xs-env"
+            env_sh = xs_env_root / "env.sh"
+            emu_path = xs_env_root / "XiangShan" / "build" / "verilator-compile" / "emu"
+            diff_path = xs_env_root / "NEMU" / "build" / "riscv64-nemu-interpreter-so"
+            build_dir = root / "build"
+            bin_path = build_dir / "test.bin"
+            elf_path = build_dir / "test.elf"
+            stdout_log_path = build_dir / "stdout.log"
+            stderr_log_path = build_dir / "stderr.log"
+            run_meta_path = build_dir / "run_meta.json"
+
+            emu_path.parent.mkdir(parents=True, exist_ok=True)
+            diff_path.parent.mkdir(parents=True, exist_ok=True)
+            build_dir.mkdir(parents=True, exist_ok=True)
+
+            env_sh.write_text("#!/bin/sh\n")
+            emu_path.write_text("#!/bin/sh\nexit 0\n")
+            emu_path.chmod(0o755)
+            diff_path.write_text("stub diff\n")
+            bin_path.write_bytes(b"\x00")
+            elf_path.write_bytes(b"\x00")
+            stdout_log_path.write_text("")
+            stderr_log_path.write_text("")
+
+            artifacts = model.RunSeedArtifacts(
+                suite_name="demo",
+                target="xiangshan-verilator",
+                seed=4660,
+                run_batch="batch",
+                build_artifact=model.BuildArtifact(
+                    suite_name="demo",
+                    build_dir=build_dir,
+                    generated_suite_path=build_dir / "generated_suite.c",
+                    elf_path=elf_path,
+                    bin_path=bin_path,
+                    build_manifest_path=build_dir / "build_manifest.json",
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+            )
+
+            def fake_run(command, **kwargs):
+                kwargs["stdout"].write("Core 0: EXCEEDING CYCLE/INSTR LIMIT at pc = 0x80000000\n")
+                kwargs["stdout"].flush()
+                return subprocess.CompletedProcess(command, 0)
+
+            with mock.patch.dict(
+                module.os.environ,
+                {"SNIPPETGEN_XS_ENV_SH": str(env_sh)},
+                clear=False,
+            ):
+                with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                    result = module.run_target(artifacts=artifacts, timeout_s=5)
+
+        self.assertEqual("limit_exceeded", result.status)
+        self.assertIn("limit_exceeded", result.labels)
+
+    def test_xiangshan_runner_classifies_bad_trap_from_logs(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_bad_trap_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        model = importlib.import_module("generator.xsgen.model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            xs_env_root = root / "xs-env"
+            env_sh = xs_env_root / "env.sh"
+            emu_path = xs_env_root / "XiangShan" / "build" / "verilator-compile" / "emu"
+            diff_path = xs_env_root / "NEMU" / "build" / "riscv64-nemu-interpreter-so"
+            build_dir = root / "build"
+            bin_path = build_dir / "test.bin"
+            elf_path = build_dir / "test.elf"
+            stdout_log_path = build_dir / "stdout.log"
+            stderr_log_path = build_dir / "stderr.log"
+            run_meta_path = build_dir / "run_meta.json"
+
+            emu_path.parent.mkdir(parents=True, exist_ok=True)
+            diff_path.parent.mkdir(parents=True, exist_ok=True)
+            build_dir.mkdir(parents=True, exist_ok=True)
+
+            env_sh.write_text("#!/bin/sh\n")
+            emu_path.write_text("#!/bin/sh\nexit 1\n")
+            emu_path.chmod(0o755)
+            diff_path.write_text("stub diff\n")
+            bin_path.write_bytes(b"\x00")
+            elf_path.write_bytes(b"\x00")
+            stdout_log_path.write_text("")
+            stderr_log_path.write_text("")
+
+            artifacts = model.RunSeedArtifacts(
+                suite_name="demo",
+                target="xiangshan-verilator",
+                seed=4660,
+                run_batch="batch",
+                build_artifact=model.BuildArtifact(
+                    suite_name="demo",
+                    build_dir=build_dir,
+                    generated_suite_path=build_dir / "generated_suite.c",
+                    elf_path=elf_path,
+                    bin_path=bin_path,
+                    build_manifest_path=build_dir / "build_manifest.json",
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+            )
+
+            def fake_run(command, **kwargs):
+                kwargs["stdout"].write("Core 0: HIT BAD TRAP at pc = 0x8000002c\n")
+                kwargs["stdout"].flush()
+                return subprocess.CompletedProcess(command, 1)
+
+            with mock.patch.dict(
+                module.os.environ,
+                {"SNIPPETGEN_XS_ENV_SH": str(env_sh)},
+                clear=False,
+            ):
+                with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                    result = module.run_target(artifacts=artifacts, timeout_s=5)
+
+        self.assertEqual("bad_trap", result.status)
+        self.assertIn("bad_trap", result.labels)
+
+    def test_xiangshan_runner_classifies_abort_from_logs(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_abort_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        model = importlib.import_module("generator.xsgen.model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            xs_env_root = root / "xs-env"
+            env_sh = xs_env_root / "env.sh"
+            emu_path = xs_env_root / "XiangShan" / "build" / "verilator-compile" / "emu"
+            diff_path = xs_env_root / "NEMU" / "build" / "riscv64-nemu-interpreter-so"
+            build_dir = root / "build"
+            bin_path = build_dir / "test.bin"
+            elf_path = build_dir / "test.elf"
+            stdout_log_path = build_dir / "stdout.log"
+            stderr_log_path = build_dir / "stderr.log"
+            run_meta_path = build_dir / "run_meta.json"
+
+            emu_path.parent.mkdir(parents=True, exist_ok=True)
+            diff_path.parent.mkdir(parents=True, exist_ok=True)
+            build_dir.mkdir(parents=True, exist_ok=True)
+
+            env_sh.write_text("#!/bin/sh\n")
+            emu_path.write_text("#!/bin/sh\nexit 1\n")
+            emu_path.chmod(0o755)
+            diff_path.write_text("stub diff\n")
+            bin_path.write_bytes(b"\x00")
+            elf_path.write_bytes(b"\x00")
+            stdout_log_path.write_text("")
+            stderr_log_path.write_text("")
+
+            artifacts = model.RunSeedArtifacts(
+                suite_name="demo",
+                target="xiangshan-verilator",
+                seed=4660,
+                run_batch="batch",
+                build_artifact=model.BuildArtifact(
+                    suite_name="demo",
+                    build_dir=build_dir,
+                    generated_suite_path=build_dir / "generated_suite.c",
+                    elf_path=elf_path,
+                    bin_path=bin_path,
+                    build_manifest_path=build_dir / "build_manifest.json",
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+                wave_path=build_dir / "lightsss-wave",
+            )
+
+            def fake_run(command, **kwargs):
+                kwargs["stdout"].write("Assertion failed at /tmp/Rob.sv:1.\nCore 0: ABORT at pc = 0x80000174\n")
+                kwargs["stdout"].flush()
+                return subprocess.CompletedProcess(command, 1)
+
+            with mock.patch.dict(
+                module.os.environ,
+                {"SNIPPETGEN_XS_ENV_SH": str(env_sh)},
+                clear=False,
+            ):
+                with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                    result = module.run_target(artifacts=artifacts, timeout_s=5)
+
+        self.assertEqual("abort", result.status)
+        self.assertIn("abort", result.labels)
 
     def test_run_batch_writes_seed_isolated_artifacts_and_ledger(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
@@ -237,16 +535,26 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual("xiangshan-verilator", ledger["target"])
         self.assertEqual("test-batch", ledger["run_batch"])
         self.assertEqual([11, 12], [entry["seed"] for entry in ledger["entries"]])
+        self.assertEqual(str(self.run_root / "run_ledger.json"), str(ledger_path))
 
         for seed in (11, 12):
-            seed_dir = self.run_root / "test-batch" / f"seed_{seed}"
+            seed_dir = self.run_root / f"seed_{seed}"
             with self.subTest(seed=seed):
                 self.assertTrue((seed_dir / "generated_suite.c").is_file())
                 self.assertTrue((seed_dir / "test.elf").is_file())
                 self.assertTrue((seed_dir / "test.bin").is_file())
+                self.assertTrue((seed_dir / "disasm").is_file())
                 self.assertTrue((seed_dir / "stdout.log").is_file())
                 self.assertTrue((seed_dir / "stderr.log").is_file())
                 self.assertTrue((seed_dir / "run_meta.json").is_file())
+                self.assertEqual(
+                    str(seed_dir / "lightsss-wave"),
+                    ledger["entries"][seed - 11]["wave_path"],
+                )
+                self.assertEqual(
+                    str(seed_dir / "disasm"),
+                    ledger["entries"][seed - 11]["disasm"],
+                )
 
     def test_failed_run_still_writes_meta_and_logs(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
@@ -272,7 +580,7 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual("error", ledger["entries"][0]["status"])
         self.assertIn("error", ledger["entries"][0]["labels"])
 
-        seed_dir = self.run_root / "failing-batch" / "seed_21"
+        seed_dir = self.run_root / "seed_21"
         self.assertTrue((seed_dir / "stdout.log").is_file())
         self.assertTrue((seed_dir / "stderr.log").is_file())
         self.assertTrue((seed_dir / "run_meta.json").is_file())

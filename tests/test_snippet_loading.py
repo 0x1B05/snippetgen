@@ -39,6 +39,30 @@ VSETVL_PATH_FILES = [
     "suites/vsetvl_interrupt_path_poc.yaml",
 ]
 
+VSETVL_SEARCH_FILES = [
+    "snippets/vector_interrupt/vsetvl_interrupt_search.c",
+    "snippets/vector_interrupt/check_vsetvl_interrupt_search.c",
+    "snippets/manifests/vsetvl_interrupt_search.yaml",
+    "snippets/manifests/check_vsetvl_interrupt_search.yaml",
+    "suites/vsetvl_interrupt_search_poc.yaml",
+]
+
+INTERRUPT_RESPONSE_FILES = [
+    "snippets/interrupt/interrupt_response_wait.c",
+    "snippets/interrupt/check_interrupt_response.c",
+    "snippets/manifests/interrupt_response_wait.yaml",
+    "snippets/manifests/check_interrupt_response.yaml",
+    "suites/interrupt_response_poc.yaml",
+]
+
+SPLIT_STORE_FORWARD_FILES = [
+    "snippets/store_forward/misaligned_split_store_search.c",
+    "snippets/store_forward/check_misaligned_split_store_search.c",
+    "snippets/manifests/misaligned_split_store_search.yaml",
+    "snippets/manifests/check_misaligned_split_store_search.yaml",
+    "suites/misaligned_split_store_search_poc.yaml",
+]
+
 
 class SnippetLoadingTest(unittest.TestCase):
     def test_round2_files_exist(self) -> None:
@@ -51,6 +75,21 @@ class SnippetLoadingTest(unittest.TestCase):
             with self.subTest(path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_file())
 
+    def test_vsetvl_search_files_exist(self) -> None:
+        for relative_path in VSETVL_SEARCH_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_interrupt_response_files_exist(self) -> None:
+        for relative_path in INTERRUPT_RESPONSE_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_split_store_forward_files_exist(self) -> None:
+        for relative_path in SPLIT_STORE_FORWARD_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
     def test_snippet_sources_compile(self) -> None:
         snippet_sources = [
             "snippets/core/init_basic_env.c",
@@ -60,6 +99,12 @@ class SnippetLoadingTest(unittest.TestCase):
             "snippets/scalar_load_legality/check_scalar_load_legality.c",
             "snippets/vector_interrupt/vsetvl_interrupt_path.c",
             "snippets/vector_interrupt/check_vsetvl_interrupt_path.c",
+            "snippets/vector_interrupt/vsetvl_interrupt_search.c",
+            "snippets/vector_interrupt/check_vsetvl_interrupt_search.c",
+            "snippets/interrupt/interrupt_response_wait.c",
+            "snippets/interrupt/check_interrupt_response.c",
+            "snippets/store_forward/misaligned_split_store_search.c",
+            "snippets/store_forward/check_misaligned_split_store_search.c",
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -121,6 +166,67 @@ class SnippetLoadingTest(unittest.TestCase):
                 "arm_timer",
                 "vsetvl_interrupt_path",
                 "check_vsetvl_interrupt_path",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_vsetvl_search_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/vsetvl_interrupt_search_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "vsetvl_interrupt_search",
+                "check_vsetvl_interrupt_search",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_interrupt_response_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/interrupt_response_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "arm_timer",
+                "interrupt_response_wait",
+                "check_interrupt_response",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_split_store_forward_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/misaligned_split_store_search_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "misaligned_split_store_search",
+                "check_misaligned_split_store_search",
                 "finish_check",
             ),
             plan_first.snippet_ids,
@@ -365,6 +471,26 @@ class SnippetLoadingTest(unittest.TestCase):
         source = (ROOT / "snippets/scalar_load_legality/unaligned_load.c").read_text()
         self.assertIn("__riscv", source)
         self.assertIn('"lw %0, 0(%1)"', source)
+
+    def test_vsetvl_search_source_arms_single_timer_before_dense_loop(self) -> None:
+        source = (ROOT / "snippets/vector_interrupt/vsetvl_interrupt_search.c").read_text()
+
+        self.assertEqual(1, source.count("xsrt_enable_stimer();"))
+        self.assertEqual(1, source.count("xsrt_timer_arm_delta("))
+        self.assertIn("vsetvl zero, zero, zero", source)
+        self.assertLess(source.index("xsrt_timer_arm_delta("), source.rindex("for (unsigned long index = 0;"))
+
+    def test_split_store_search_source_loads_high_half_first_for_diagnosis(self) -> None:
+        source = (ROOT / "snippets/store_forward/misaligned_split_store_search.c").read_text()
+
+        self.assertIn("\"lwu %0, 0(%3)", source)
+        self.assertIn("\"lhu %1, 4(%3)", source)
+        self.assertIn("\"lbu %2, 6(%3)", source)
+        self.assertLess(source.index("\"lwu %0, 0(%3)"), source.index("\"lhu %1, 4(%3)"))
+        self.assertLess(source.index("\"lhu %1, 4(%3)"), source.index("\"lbu %2, 6(%3)"))
+        self.assertIn("xsrt_csr_write(12u, probe0_word32);", source)
+        self.assertIn("xsrt_csr_write(13u, probe0_half16);", source)
+        self.assertIn("xsrt_csr_write(14u, probe0_byte8);", source)
 
     def test_declared_python_dependency(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text()

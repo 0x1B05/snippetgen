@@ -1,0 +1,5 @@
+id: misaligned_split_store_search
+kind: proc
+lang: c
+sources:
+  - snippets/store_forward/misaligned_split_store_search.c

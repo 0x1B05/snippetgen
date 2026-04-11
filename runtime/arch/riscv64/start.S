@@ -1,15 +1,25 @@
-.section .bss.stack, "aw", @nobits
-.align 12
-.globl xsrt_boot_stack
-xsrt_boot_stack:
-  .space 4096
-.globl xsrt_boot_stack_top
-xsrt_boot_stack_top:
-
-.section .text.start
+.section entry, "ax"
 .globl _start
+.type _start, @function
+
+#define MSTATUS_FS 0x00006000
+#define STKSHIFT 17
+
 _start:
-  la sp, xsrt_boot_stack_top
+  mv s0, zero
+  li a0, MSTATUS_FS & (MSTATUS_FS >> 1)
+  csrs mstatus, a0
+  csrwi fcsr, 0
+
+  csrr a0, mhartid
+  la tp, _stack_top
+  addi sp, a0, 1
+  slli sp, sp, STKSHIFT
+  add sp, sp, tp
+  slli a2, a0, STKSHIFT
+  add tp, tp, a2
+
   call main
 1:
+  .word 0x0005006b
   j 1b

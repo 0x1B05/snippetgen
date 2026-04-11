@@ -1,0 +1,5 @@
+id: interrupt_response_wait
+kind: proc
+lang: c
+sources:
+  - snippets/interrupt/interrupt_response_wait.c

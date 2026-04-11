@@ -9,6 +9,9 @@ typedef struct {
   uint64_t snippet_id;
   uint64_t seed;
   uint64_t flags;
+  uint64_t interrupt_count;
+  uint64_t last_trap_cause;
+  uint64_t last_trap_epc;
 } xsrt_env_t;
 
 enum {
@@ -19,5 +22,6 @@ enum {
 void xsrt_init(xsrt_env_t *env);
 void xsrt_finish_pass(xsrt_env_t *env);
 void xsrt_finish_fail(xsrt_env_t *env, uint64_t code);
+xsrt_env_t *xsrt_current_env(void);
 
 #endif

@@ -1,0 +1,10 @@
+suite: vsetvl_interrupt_search_poc
+target: xiangshan-verilator
+seed: 4660
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - vsetvl_interrupt_search
+    - check_vsetvl_interrupt_search
+    - finish_check

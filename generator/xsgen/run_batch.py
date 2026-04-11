@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import UTC, datetime
 from pathlib import Path
 import json
 
@@ -69,7 +68,7 @@ def normalize_seeds(
 
 
 def _default_run_batch_id() -> str:
-    return datetime.now(UTC).strftime("%Y%m%dT%H%M%S_%fZ")
+    return "stable"
 
 
 def _ensure_log_files(stdout_log_path: Path, stderr_log_path: Path) -> None:
@@ -88,9 +87,11 @@ def _entry_payload(entry: RunEntry) -> dict:
         "artifact_dir": str(entry.artifact_dir),
         "elf": str(entry.elf_path),
         "bin": str(entry.bin_path),
+        "disasm": str(entry.disasm_path) if entry.disasm_path is not None else None,
         "stdout_log": str(entry.stdout_log_path),
         "stderr_log": str(entry.stderr_log_path),
         "run_meta": str(entry.run_meta_path),
+        "wave_path": str(entry.wave_path) if entry.wave_path is not None else None,
         "status": entry.status,
         "labels": list(entry.labels),
         "notes": entry.notes,
@@ -138,7 +139,7 @@ def run_suite_batch(
     snippet_db = load_snippet_db(repo_root)
     base_suite = load_suite(suite_path)
     run_batch = run_batch_id or _default_run_batch_id()
-    ledger_path = (repo_root / "build" / base_suite.name / "runs" / run_batch / "run_ledger.json").resolve()
+    ledger_path = (repo_root / "build" / base_suite.name / "runs" / "run_ledger.json").resolve()
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     target_runner = target_loader(repo_root, base_suite.target)
     entries: list[RunEntry] = []
@@ -150,6 +151,7 @@ def run_suite_batch(
         stdout_log_path = artifact.build_dir / "stdout.log"
         stderr_log_path = artifact.build_dir / "stderr.log"
         run_meta_path = artifact.build_dir / "run_meta.json"
+        wave_path = artifact.build_dir / "lightsss-wave"
         _ensure_log_files(stdout_log_path, stderr_log_path)
 
         try:
@@ -164,6 +166,7 @@ def run_suite_batch(
                 stdout_log_path=stdout_log_path,
                 stderr_log_path=stderr_log_path,
                 run_meta_path=run_meta_path,
+                wave_path=wave_path,
             )
             target_result = target_runner(artifacts=run_artifacts, timeout_s=timeout_s)
         except Exception as exc:
@@ -183,9 +186,11 @@ def run_suite_batch(
             artifact_dir=artifact.build_dir,
             elf_path=artifact.elf_path,
             bin_path=artifact.bin_path,
+            disasm_path=artifact.disasm_path,
             stdout_log_path=stdout_log_path,
             stderr_log_path=stderr_log_path,
             run_meta_path=run_meta_path,
+            wave_path=wave_path,
             status=target_result.status,
             labels=target_result.labels,
             notes=target_result.notes,

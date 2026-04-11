@@ -15,5 +15,6 @@ struct xsrt_trap_frame {
 typedef xsrt_trap_frame_t *(*xsrt_trap_handler_t)(xsrt_trap_frame_t *);
 
 void xsrt_install_strap(xsrt_trap_handler_t fn);
+xsrt_trap_frame_t *xsrt_dispatch_strap(xsrt_trap_frame_t *frame);
 
 #endif

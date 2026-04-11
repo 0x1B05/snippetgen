@@ -1,0 +1,12 @@
+#ifndef XS_INTERRUPT_RESPONSE_H
+#define XS_INTERRUPT_RESPONSE_H
+
+#include <stdint.h>
+
+enum {
+  XS_INTERRUPT_FLAG_TIMER_ARMED = 0x10u,
+  XS_INTERRUPT_FLAG_TRAP_OBSERVED = 0x20u,
+  XS_INTERRUPT_MCAUSE_MTIP = (uint64_t) (1ull << 63) | 7u,
+};
+
+#endif

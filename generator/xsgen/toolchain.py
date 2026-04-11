@@ -17,6 +17,7 @@ def _artifact_paths_for_build_dir(build_dir: Path, suite_name: str) -> BuildArti
         generated_suite_path=build_dir / "generated_suite.c",
         elf_path=build_dir / "test.elf",
         bin_path=build_dir / "test.bin",
+        disasm_path=build_dir / "disasm",
         build_manifest_path=build_dir / "build_manifest.json",
     )
 
@@ -31,7 +32,7 @@ def artifact_paths_for_run_seed(
     run_batch: str,
     seed: int,
 ) -> BuildArtifact:
-    build_dir = repo_root / "build" / suite_name / "runs" / run_batch / f"seed_{seed}"
+    build_dir = repo_root / "build" / suite_name / "runs" / f"seed_{seed}"
     return _artifact_paths_for_build_dir(build_dir, suite_name)
 
 
@@ -89,6 +90,10 @@ def runtime_sources(repo_root: Path) -> list[Path]:
     ]
 
 
+def runtime_linker_script(repo_root: Path) -> Path:
+    return (repo_root / "runtime" / "platform" / "xiangshan" / "section.ld").resolve()
+
+
 def unique_plan_sources(plan: ComposePlan) -> list[Path]:
     seen: set[Path] = set()
     ordered: list[Path] = []
@@ -109,10 +114,14 @@ def build_artifacts(
     artifact: BuildArtifact,
 ) -> BuildArtifact:
     compile_flags = [
+        "-O2",
         "-march=rv64gc",
         "-mabi=lp64d",
         "-mcmodel=medany",
         "-ffreestanding",
+        "-fno-asynchronous-unwind-tables",
+        "-fno-builtin",
+        "-fno-stack-protector",
     ]
     include_flags = [
         "-I",
@@ -132,7 +141,7 @@ def build_artifacts(
         shutil.rmtree(object_dir)
     object_dir.mkdir(parents=True, exist_ok=True)
 
-    for path in (artifact.elf_path, artifact.bin_path, artifact.build_manifest_path):
+    for path in (artifact.elf_path, artifact.bin_path, artifact.disasm_path, artifact.build_manifest_path):
         if path.exists():
             path.unlink()
 
@@ -209,8 +218,7 @@ def build_artifacts(
         "-nostdlib",
         "-nostartfiles",
         "-static",
-        "-Wl,-e,_start",
-        "-Wl,-Ttext=0x80000000",
+        f"-Wl,-T{runtime_linker_script(repo_root)}",
         "-o",
         str(artifact.elf_path),
     ]
@@ -248,10 +256,28 @@ def build_artifacts(
                 path.unlink()
         raise RuntimeError(f"objcopy failed: {objcopy_cmd[0]}") from exc
     if objcopy_result.returncode != 0:
-        for path in (artifact.elf_path, artifact.bin_path, artifact.build_manifest_path):
+        for path in (artifact.elf_path, artifact.bin_path, artifact.disasm_path, artifact.build_manifest_path):
             if path.exists():
                 path.unlink()
         raise RuntimeError(objcopy_result.stderr or "RISC-V objcopy failed")
+
+    objdump_cmd = [
+        resolve_objdump(toolchain),
+        "-d",
+        str(artifact.elf_path),
+    ]
+    objdump_result = subprocess.run(
+        objdump_cmd,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if objdump_result.returncode != 0:
+        for path in (artifact.elf_path, artifact.bin_path, artifact.disasm_path, artifact.build_manifest_path):
+            if path.exists():
+                path.unlink()
+        raise RuntimeError(objdump_result.stderr or "RISC-V objdump failed")
+    artifact.disasm_path.write_text(objdump_result.stdout)
 
     manifest_payload = {
         "suite": plan.suite_name,
@@ -264,12 +290,14 @@ def build_artifacts(
             "generated_suite": str(artifact.generated_suite_path),
             "elf": str(artifact.elf_path),
             "bin": str(artifact.bin_path),
+            "disasm": str(artifact.disasm_path),
             "build_manifest": str(artifact.build_manifest_path),
         },
         "commands": {
             "compile": compile_commands,
             "link": link_cmd,
             "objcopy": objcopy_cmd,
+            "objdump": objdump_cmd,
         },
     }
     artifact.build_manifest_path.write_text(json.dumps(manifest_payload, indent=2, sort_keys=True))

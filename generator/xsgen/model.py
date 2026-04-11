@@ -37,6 +37,7 @@ class BuildArtifact:
     generated_suite_path: Path
     elf_path: Path | None = None
     bin_path: Path | None = None
+    disasm_path: Path | None = None
     build_manifest_path: Path | None = None
 
 
@@ -50,6 +51,7 @@ class RunSeedArtifacts:
     stdout_log_path: Path
     stderr_log_path: Path
     run_meta_path: Path
+    wave_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -69,9 +71,11 @@ class RunEntry:
     artifact_dir: Path
     elf_path: Path
     bin_path: Path
+    disasm_path: Path | None
     stdout_log_path: Path
     stderr_log_path: Path
     run_meta_path: Path
+    wave_path: Path | None
     status: str
     labels: tuple[str, ...]
     notes: str

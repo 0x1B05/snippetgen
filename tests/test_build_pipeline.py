@@ -19,10 +19,19 @@ class BuildPipelineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.build_dir = ROOT / "build" / "scalar_load_legality_poc"
         self.vsetvl_build_dir = ROOT / "build" / "vsetvl_interrupt_path_poc"
+        self.vsetvl_search_build_dir = ROOT / "build" / "vsetvl_interrupt_search_poc"
+        self.interrupt_build_dir = ROOT / "build" / "interrupt_response_poc"
+        self.split_store_build_dir = ROOT / "build" / "misaligned_split_store_search_poc"
         if self.build_dir.exists():
             shutil.rmtree(self.build_dir)
         if self.vsetvl_build_dir.exists():
             shutil.rmtree(self.vsetvl_build_dir)
+        if self.vsetvl_search_build_dir.exists():
+            shutil.rmtree(self.vsetvl_search_build_dir)
+        if self.interrupt_build_dir.exists():
+            shutil.rmtree(self.interrupt_build_dir)
+        if self.split_store_build_dir.exists():
+            shutil.rmtree(self.split_store_build_dir)
 
     def test_emitter_generates_harness_in_suite_order(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")
@@ -130,11 +139,13 @@ class BuildPipelineTest(unittest.TestCase):
         generated_suite = self.build_dir / "generated_suite.c"
         test_elf = self.build_dir / "test.elf"
         test_bin = self.build_dir / "test.bin"
+        disasm = self.build_dir / "disasm"
         build_manifest = self.build_dir / "build_manifest.json"
 
         self.assertTrue(generated_suite.is_file())
         self.assertTrue(test_elf.is_file())
         self.assertTrue(test_bin.is_file())
+        self.assertTrue(disasm.is_file())
         self.assertTrue(build_manifest.is_file())
 
         manifest = json.loads(build_manifest.read_text())
@@ -146,6 +157,7 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertEqual(str(generated_suite), manifest["artifacts"]["generated_suite"])
         self.assertEqual(str(test_elf), manifest["artifacts"]["elf"])
         self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
+        self.assertEqual(str(disasm), manifest["artifacts"]["disasm"])
         self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
         self.assertTrue(manifest["commands"]["compile"])
         self.assertTrue(manifest["commands"]["link"])
@@ -164,11 +176,13 @@ class BuildPipelineTest(unittest.TestCase):
         generated_suite = self.vsetvl_build_dir / "generated_suite.c"
         test_elf = self.vsetvl_build_dir / "test.elf"
         test_bin = self.vsetvl_build_dir / "test.bin"
+        disasm = self.vsetvl_build_dir / "disasm"
         build_manifest = self.vsetvl_build_dir / "build_manifest.json"
 
         self.assertTrue(generated_suite.is_file())
         self.assertTrue(test_elf.is_file())
         self.assertTrue(test_bin.is_file())
+        self.assertTrue(disasm.is_file())
         self.assertTrue(build_manifest.is_file())
 
         manifest = json.loads(build_manifest.read_text())
@@ -180,10 +194,113 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertEqual(str(generated_suite), manifest["artifacts"]["generated_suite"])
         self.assertEqual(str(test_elf), manifest["artifacts"]["elf"])
         self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
+        self.assertEqual(str(disasm), manifest["artifacts"]["disasm"])
         self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
         self.assertTrue(manifest["commands"]["compile"])
         self.assertTrue(manifest["commands"]["link"])
         self.assertTrue(manifest["commands"]["objcopy"])
+
+    def test_interrupt_response_suite_build_generates_artifacts_and_manifest(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", "suites/interrupt_response_poc.yaml"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        generated_suite = self.interrupt_build_dir / "generated_suite.c"
+        test_elf = self.interrupt_build_dir / "test.elf"
+        test_bin = self.interrupt_build_dir / "test.bin"
+        disasm = self.interrupt_build_dir / "disasm"
+        build_manifest = self.interrupt_build_dir / "build_manifest.json"
+
+        self.assertTrue(generated_suite.is_file())
+        self.assertTrue(test_elf.is_file())
+        self.assertTrue(test_bin.is_file())
+        self.assertTrue(disasm.is_file())
+        self.assertTrue(build_manifest.is_file())
+
+        manifest = json.loads(build_manifest.read_text())
+        self.assertEqual("interrupt_response_poc", manifest["suite"])
+        self.assertEqual(
+            ["init_basic_env", "arm_timer", "interrupt_response_wait", "check_interrupt_response", "finish_check"],
+            manifest["snippet_ids"],
+        )
+        self.assertEqual(str(generated_suite), manifest["artifacts"]["generated_suite"])
+        self.assertEqual(str(test_elf), manifest["artifacts"]["elf"])
+        self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
+        self.assertEqual(str(disasm), manifest["artifacts"]["disasm"])
+        self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
+
+    def test_vsetvl_search_suite_build_generates_artifacts_and_manifest(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", "suites/vsetvl_interrupt_search_poc.yaml"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        generated_suite = self.vsetvl_search_build_dir / "generated_suite.c"
+        test_elf = self.vsetvl_search_build_dir / "test.elf"
+        test_bin = self.vsetvl_search_build_dir / "test.bin"
+        disasm = self.vsetvl_search_build_dir / "disasm"
+        build_manifest = self.vsetvl_search_build_dir / "build_manifest.json"
+
+        self.assertTrue(generated_suite.is_file())
+        self.assertTrue(test_elf.is_file())
+        self.assertTrue(test_bin.is_file())
+        self.assertTrue(disasm.is_file())
+        self.assertTrue(build_manifest.is_file())
+
+        manifest = json.loads(build_manifest.read_text())
+        self.assertEqual("vsetvl_interrupt_search_poc", manifest["suite"])
+        self.assertEqual(
+            ["init_basic_env", "vsetvl_interrupt_search", "check_vsetvl_interrupt_search", "finish_check"],
+            manifest["snippet_ids"],
+        )
+        self.assertEqual(str(generated_suite), manifest["artifacts"]["generated_suite"])
+        self.assertEqual(str(test_elf), manifest["artifacts"]["elf"])
+        self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
+        self.assertEqual(str(disasm), manifest["artifacts"]["disasm"])
+        self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
+
+    def test_split_store_search_suite_build_generates_artifacts_and_manifest(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", "suites/misaligned_split_store_search_poc.yaml"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        generated_suite = self.split_store_build_dir / "generated_suite.c"
+        test_elf = self.split_store_build_dir / "test.elf"
+        test_bin = self.split_store_build_dir / "test.bin"
+        disasm = self.split_store_build_dir / "disasm"
+        build_manifest = self.split_store_build_dir / "build_manifest.json"
+
+        self.assertTrue(generated_suite.is_file())
+        self.assertTrue(test_elf.is_file())
+        self.assertTrue(test_bin.is_file())
+        self.assertTrue(disasm.is_file())
+        self.assertTrue(build_manifest.is_file())
+
+        manifest = json.loads(build_manifest.read_text())
+        self.assertEqual("misaligned_split_store_search_poc", manifest["suite"])
+        self.assertEqual(
+            ["init_basic_env", "misaligned_split_store_search", "check_misaligned_split_store_search", "finish_check"],
+            manifest["snippet_ids"],
+        )
+        self.assertEqual(str(generated_suite), manifest["artifacts"]["generated_suite"])
+        self.assertEqual(str(test_elf), manifest["artifacts"]["elf"])
+        self.assertEqual(str(test_bin), manifest["artifacts"]["bin"])
+        self.assertEqual(str(disasm), manifest["artifacts"]["disasm"])
+        self.assertEqual(str(build_manifest), manifest["artifacts"]["build_manifest"])
 
     def test_vsetvl_suite_harness_order_and_final_elf_contains_vsetvl(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")
@@ -236,6 +353,172 @@ class BuildPipelineTest(unittest.TestCase):
             if instruction == "vsetvl\tzero,zero,zero"
         )
         self.assertLess(enable_index, vsetvl_index)
+
+    def test_runtime_entry_emits_noop_halt_trap_after_main_returns(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        suite = suite_loader.load_suite(ROOT / "suites/vsetvl_interrupt_path_poc.yaml")
+        plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+        artifact = toolchain.artifact_paths_for_suite(ROOT, suite.name)
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+        toolchain.build_artifacts(ROOT, plan, artifact)
+
+        objdump = toolchain.resolve_objdump(toolchain.detect_toolchain())
+        disasm_result = subprocess.run(
+            [objdump, "-d", "--disassemble=_start", str(artifact.elf_path)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, disasm_result.returncode, msg=disasm_result.stderr)
+
+        instructions = []
+        for line in disasm_result.stdout.splitlines():
+            fields = line.split("\t")
+            if len(fields) < 3:
+                continue
+            instructions.append("\t".join(field.strip() for field in fields[2:] if field.strip()))
+
+        call_index = next(
+            index for index, instruction in enumerate(instructions)
+            if instruction.startswith("call\t") or instruction.startswith("jal\t")
+        )
+        halt_index = next(
+            index for index, instruction in enumerate(instructions)
+            if instruction == ".word\t0x0005006b"
+        )
+        self.assertLess(call_index, halt_index)
+
+    def test_interrupt_runtime_emits_trap_entry_and_timer_enable_sequence(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        suite = suite_loader.load_suite(ROOT / "suites/interrupt_response_poc.yaml")
+        plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+        artifact = toolchain.artifact_paths_for_suite(ROOT, suite.name)
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+        toolchain.build_artifacts(ROOT, plan, artifact)
+
+        objdump = toolchain.resolve_objdump(toolchain.detect_toolchain())
+        trap_result = subprocess.run(
+            [objdump, "-d", "--disassemble=xsrt_trap_entry", str(artifact.elf_path)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, trap_result.returncode, msg=trap_result.stderr)
+        self.assertIn("mret", trap_result.stdout)
+        self.assertIn("csrrw", trap_result.stdout)
+        self.assertIn("mscratch", trap_result.stdout)
+
+        arm_result = subprocess.run(
+            [objdump, "-d", "--disassemble=xsrt_enable_stimer", str(artifact.elf_path)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, arm_result.returncode, msg=arm_result.stderr)
+        instructions = []
+        for line in arm_result.stdout.splitlines():
+            fields = line.split("\t")
+            if len(fields) < 3:
+                continue
+            instructions.append("\t".join(field.strip() for field in fields[2:] if field.strip()))
+
+        self.assertTrue(any(instruction.startswith("csrw\tmtvec,") for instruction in instructions))
+        self.assertTrue(any(instruction.startswith("csrw\tmscratch,") for instruction in instructions))
+        self.assertTrue(any(instruction.startswith("csrs\tmie,") for instruction in instructions))
+        self.assertTrue(any(instruction.startswith("csrs\tmstatus,") for instruction in instructions))
+
+    def test_vsetvl_search_suite_final_elf_contains_vsetvl(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        suite = suite_loader.load_suite(ROOT / "suites/vsetvl_interrupt_search_poc.yaml")
+        plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+        artifact = toolchain.artifact_paths_for_suite(ROOT, suite.name)
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+        toolchain.build_artifacts(ROOT, plan, artifact)
+
+        objdump = toolchain.resolve_objdump(toolchain.detect_toolchain())
+        disasm_result = subprocess.run(
+            [objdump, "-d", "--disassemble=vsetvl_interrupt_search_run", str(artifact.elf_path)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, disasm_result.returncode, msg=disasm_result.stderr)
+        self.assertIn("vsetvl\tzero,zero,zero", disasm_result.stdout)
+
+    def test_split_store_search_suite_final_elf_contains_split_store_and_aligned_loads(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        suite = suite_loader.load_suite(ROOT / "suites/misaligned_split_store_search_poc.yaml")
+        plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+        artifact = toolchain.artifact_paths_for_suite(ROOT, suite.name)
+        emitter.emit_harness(plan, artifact.generated_suite_path)
+        toolchain.build_artifacts(ROOT, plan, artifact)
+
+        disasm_result = subprocess.run(
+            [toolchain.resolve_objdump(toolchain.detect_toolchain()), "-d", "--disassemble=misaligned_split_store_search_run", str(artifact.elf_path)],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, disasm_result.returncode, msg=disasm_result.stderr)
+        instructions = []
+        for line in disasm_result.stdout.splitlines():
+            fields = line.split("\t")
+            if len(fields) < 3:
+                continue
+            instructions.append("\t".join(field.strip() for field in fields[2:] if field.strip()))
+
+        target_store_count = sum(
+            1 for instruction in instructions
+            if instruction.startswith("sd\t") and ",0(" in instruction
+        )
+        detector_load_count = sum(1 for instruction in instructions if instruction.startswith("lwu\t"))
+        self.assertGreaterEqual(target_store_count, 17, msg=disasm_result.stdout)
+        self.assertGreaterEqual(detector_load_count, 2, msg=disasm_result.stdout)
+        self.assertTrue(any(instruction.startswith("lhu\t") for instruction in instructions), msg=disasm_result.stdout)
+        self.assertTrue(any(instruction.startswith("lbu\t") for instruction in instructions), msg=disasm_result.stdout)
+
+    def test_build_manifest_uses_xiangshan_linker_script(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", "suites/vsetvl_interrupt_path_poc.yaml"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        manifest = json.loads((self.vsetvl_build_dir / "build_manifest.json").read_text())
+        link_cmd = manifest["commands"]["link"]
+
+        linker_arg = next(
+            arg for arg in link_cmd
+            if arg.startswith("-Wl,-T")
+        )
+        self.assertEqual(
+            f'-Wl,-T{(ROOT / "runtime" / "platform" / "xiangshan" / "section.ld").resolve()}',
+            linker_arg,
+        )
 
     def test_cli_build_defaults_to_poc_suite(self) -> None:
         result = subprocess.run(
