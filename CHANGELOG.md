@@ -37,4 +37,4 @@
 
 For a fuller release snapshot, see:
 
-- [`docs/release-notes-2026-04-11.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/release-notes-2026-04-11.md)
+- [`docs/release-notes-2026-04-11.md`](docs/release-notes-2026-04-11.md)

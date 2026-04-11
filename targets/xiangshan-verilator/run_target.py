@@ -14,25 +14,17 @@ DEFAULT_TIMEOUT_SEC = 120
 DEFAULT_FORK_INTERVAL_SEC = 1
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[2]
-
-
-def _default_xs_env_sh() -> Path:
-    return (_repo_root().parents[1] / "xs-env" / "env.sh").resolve()
-
-
 def _xs_env() -> dict[str, str]:
     env = dict(os.environ)
 
-    env_sh_override = env.get("SNIPPETGEN_XS_ENV_SH")
-    if env_sh_override:
-        env_sh = Path(env_sh_override)
-    else:
-        if "XS_PROJECT_ROOT" in env and "NEMU_HOME" in env and "NOOP_HOME" in env:
-            return env
-        env_sh = _default_xs_env_sh()
+    if "XS_PROJECT_ROOT" in env and "NEMU_HOME" in env and "NOOP_HOME" in env:
+        return env
 
+    env_sh_override = env.get("SNIPPETGEN_XS_ENV_SH")
+    if not env_sh_override:
+        return env
+
+    env_sh = Path(env_sh_override)
     if not env_sh.is_file():
         return env
 

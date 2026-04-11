@@ -12,7 +12,7 @@
 
 参考分析文档：
 
-- [/home/dfpmts/XS/kmh-v2/docs/vsetvl-interrupt-deqptr-final-2026-04-09.md](/home/dfpmts/XS/kmh-v2/docs/vsetvl-interrupt-deqptr-final-2026-04-09.md)
+- `$KMH_V2_ROOT/docs/vsetvl-interrupt-deqptr-final-2026-04-09.md`
 
 ## 关键结论
 
@@ -20,14 +20,14 @@
 
 此前 `snippetgen-demo` 的 timer/trap 只是 stub：
 
-- [runtime/src/xsrt_intr.c](/home/dfpmts/XS/framework/snippetgen-demo/runtime/src/xsrt_intr.c)
-- [runtime/src/xsrt_trap.c](/home/dfpmts/XS/framework/snippetgen-demo/runtime/src/xsrt_trap.c)
-- [runtime/arch/riscv64/trap.S](/home/dfpmts/XS/framework/snippetgen-demo/runtime/arch/riscv64/trap.S)
-- [snippets/scalar_load_legality/arm_timer.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/scalar_load_legality/arm_timer.c)
+- [runtime/src/xsrt_intr.c](../runtime/src/xsrt_intr.c)
+- [runtime/src/xsrt_trap.c](../runtime/src/xsrt_trap.c)
+- [runtime/arch/riscv64/trap.S](../runtime/arch/riscv64/trap.S)
+- [snippets/scalar_load_legality/arm_timer.c](../snippets/scalar_load_legality/arm_timer.c)
 
 现在已经实现了最小的 M-mode machine-timer interrupt 路径，并新增了一个专门验证它的 suite：
 
-- [suites/interrupt_response_poc.yaml](/home/dfpmts/XS/framework/snippetgen-demo/suites/interrupt_response_poc.yaml)
+- [suites/interrupt_response_poc.yaml](../suites/interrupt_response_poc.yaml)
 
 在真实 XiangShan `emu` 上运行它，结果为 `HIT GOOD TRAP`，并且该 suite 的 check 只有在下面条件成立时才通过：
 
@@ -41,7 +41,7 @@
 
 在接入真实 interrupt 路径之后，旧的 baseline：
 
-- [suites/vsetvl_interrupt_path_poc.yaml](/home/dfpmts/XS/framework/snippetgen-demo/suites/vsetvl_interrupt_path_poc.yaml)
+- [suites/vsetvl_interrupt_path_poc.yaml](../suites/vsetvl_interrupt_path_poc.yaml)
 
 继续表现为 `HIT GOOD TRAP`。这说明仅仅“有真实 interrupt + 一小段 `vsetvl` 循环”还不足以把 case 推到异常状态。
 
@@ -49,9 +49,9 @@
 
 为了更贴近文档里“围着同一个目标 `vsetvl zero, zero, zero` 压 interrupt 窗口”的思路，新增了搜索版 workload：
 
-- [suites/vsetvl_interrupt_search_poc.yaml](/home/dfpmts/XS/framework/snippetgen-demo/suites/vsetvl_interrupt_search_poc.yaml)
-- [snippets/vector_interrupt/vsetvl_interrupt_search.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/vector_interrupt/vsetvl_interrupt_search.c)
-- [snippets/vector_interrupt/check_vsetvl_interrupt_search.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/vector_interrupt/check_vsetvl_interrupt_search.c)
+- [suites/vsetvl_interrupt_search_poc.yaml](../suites/vsetvl_interrupt_search_poc.yaml)
+- [snippets/vector_interrupt/vsetvl_interrupt_search.c](../snippets/vector_interrupt/vsetvl_interrupt_search.c)
+- [snippets/vector_interrupt/check_vsetvl_interrupt_search.c](../snippets/vector_interrupt/check_vsetvl_interrupt_search.c)
 
 搜索版经历了两个阶段：
 
@@ -67,12 +67,12 @@
 
 在当前 one-shot timer + dense `vsetvl` 模型下，`seed = 0x1234` 的搜索 workload 不再是 `good trap`，而是直接命中 XiangShan 内部断言：
 
-- `Assertion failed at /home/dfpmts/XS/xs-env/XiangShan/build/rtl/Rob.sv:87867`
+- `Assertion failed at $NOOP_HOME/build/rtl/Rob.sv:87867`
 
 该断言对应的真实条件已经定位到：
 
-- [Rob.sv](/home/dfpmts/XS/xs-env/XiangShan/build/rtl/Rob.sv#L69234)
-- [Rob.scala](/home/dfpmts/XS/xs-env/XiangShan/src/main/scala/xiangshan/backend/rob/Rob.scala#L1287)
+- `$NOOP_HOME/build/rtl/Rob.sv#L69234`
+- `$NOOP_HOME/src/main/scala/xiangshan/backend/rob/Rob.scala#L1287`
 
 即：
 
@@ -108,14 +108,14 @@
 
 为了让 workload 真正能在 XiangShan `emu` 上跑通，先前已经完成这些基础对齐：
 
-- [runtime/arch/riscv64/start.S](/home/dfpmts/XS/framework/snippetgen-demo/runtime/arch/riscv64/start.S)
+- [runtime/arch/riscv64/start.S](../runtime/arch/riscv64/start.S)
   - `main` 返回后发出 XiangShan/noop halt trap，而不是死循环
-- [runtime/platform/xiangshan/section.ld](/home/dfpmts/XS/framework/snippetgen-demo/runtime/platform/xiangshan/section.ld)
+- [runtime/platform/xiangshan/section.ld](../runtime/platform/xiangshan/section.ld)
   - 使用平台 linker script
-- [generator/xsgen/toolchain.py](/home/dfpmts/XS/framework/snippetgen-demo/generator/xsgen/toolchain.py)
+- [generator/xsgen/toolchain.py](../generator/xsgen/toolchain.py)
   - build 使用 linker script
   - 编译参数对齐到更适合实际运行的设置
-- [targets/xiangshan-verilator/run_target.py](/home/dfpmts/XS/framework/snippetgen-demo/targets/xiangshan-verilator/run_target.py)
+- [targets/xiangshan-verilator/run_target.py](../targets/xiangshan-verilator/run_target.py)
   - 通过 `xs-env` 对齐 `emu` / `NEMU` 路径
   - 不再默认 `--no-diff`
 
@@ -123,51 +123,51 @@
 
 新增/修改：
 
-- [runtime/arch/riscv64/trap.S](/home/dfpmts/XS/framework/snippetgen-demo/runtime/arch/riscv64/trap.S)
+- [runtime/arch/riscv64/trap.S](../runtime/arch/riscv64/trap.S)
   - 实现真实 trap entry
   - 当前采用 `mscratch` + machine timer one-shot fast path
-- [runtime/src/xsrt_intr.c](/home/dfpmts/XS/framework/snippetgen-demo/runtime/src/xsrt_intr.c)
+- [runtime/src/xsrt_intr.c](../runtime/src/xsrt_intr.c)
   - 真实设置 `mtvec/mscratch/mie/mstatus`
   - 真实写 `mtimecmp`
-- [runtime/include/xsrt_intr.h](/home/dfpmts/XS/framework/snippetgen-demo/runtime/include/xsrt_intr.h)
-- [runtime/include/xsrt_trap.h](/home/dfpmts/XS/framework/snippetgen-demo/runtime/include/xsrt_trap.h)
-- [runtime/src/xsrt_env.c](/home/dfpmts/XS/framework/snippetgen-demo/runtime/src/xsrt_env.c)
+- [runtime/include/xsrt_intr.h](../runtime/include/xsrt_intr.h)
+- [runtime/include/xsrt_trap.h](../runtime/include/xsrt_trap.h)
+- [runtime/src/xsrt_env.c](../runtime/src/xsrt_env.c)
   - 增加 `xsrt_current_env()`
-- [runtime/src/xsrt_trap.c](/home/dfpmts/XS/framework/snippetgen-demo/runtime/src/xsrt_trap.c)
+- [runtime/src/xsrt_trap.c](../runtime/src/xsrt_trap.c)
 
 ### interrupt proof suite
 
 新增：
 
-- [snippets/include/xs_interrupt_response.h](/home/dfpmts/XS/framework/snippetgen-demo/snippets/include/xs_interrupt_response.h)
-- [snippets/interrupt/interrupt_response_wait.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/interrupt/interrupt_response_wait.c)
-- [snippets/interrupt/check_interrupt_response.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/interrupt/check_interrupt_response.c)
-- [snippets/manifests/interrupt_response_wait.yaml](/home/dfpmts/XS/framework/snippetgen-demo/snippets/manifests/interrupt_response_wait.yaml)
-- [snippets/manifests/check_interrupt_response.yaml](/home/dfpmts/XS/framework/snippetgen-demo/snippets/manifests/check_interrupt_response.yaml)
-- [suites/interrupt_response_poc.yaml](/home/dfpmts/XS/framework/snippetgen-demo/suites/interrupt_response_poc.yaml)
+- [snippets/include/xs_interrupt_response.h](../snippets/include/xs_interrupt_response.h)
+- [snippets/interrupt/interrupt_response_wait.c](../snippets/interrupt/interrupt_response_wait.c)
+- [snippets/interrupt/check_interrupt_response.c](../snippets/interrupt/check_interrupt_response.c)
+- [snippets/manifests/interrupt_response_wait.yaml](../snippets/manifests/interrupt_response_wait.yaml)
+- [snippets/manifests/check_interrupt_response.yaml](../snippets/manifests/check_interrupt_response.yaml)
+- [suites/interrupt_response_poc.yaml](../suites/interrupt_response_poc.yaml)
 
 修改：
 
-- [snippets/scalar_load_legality/arm_timer.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/scalar_load_legality/arm_timer.c)
+- [snippets/scalar_load_legality/arm_timer.c](../snippets/scalar_load_legality/arm_timer.c)
 
 ### `vsetvl` search suite
 
 新增：
 
-- [snippets/vector_interrupt/vsetvl_interrupt_search.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/vector_interrupt/vsetvl_interrupt_search.c)
-- [snippets/vector_interrupt/check_vsetvl_interrupt_search.c](/home/dfpmts/XS/framework/snippetgen-demo/snippets/vector_interrupt/check_vsetvl_interrupt_search.c)
-- [snippets/manifests/vsetvl_interrupt_search.yaml](/home/dfpmts/XS/framework/snippetgen-demo/snippets/manifests/vsetvl_interrupt_search.yaml)
-- [snippets/manifests/check_vsetvl_interrupt_search.yaml](/home/dfpmts/XS/framework/snippetgen-demo/snippets/manifests/check_vsetvl_interrupt_search.yaml)
-- [suites/vsetvl_interrupt_search_poc.yaml](/home/dfpmts/XS/framework/snippetgen-demo/suites/vsetvl_interrupt_search_poc.yaml)
+- [snippets/vector_interrupt/vsetvl_interrupt_search.c](../snippets/vector_interrupt/vsetvl_interrupt_search.c)
+- [snippets/vector_interrupt/check_vsetvl_interrupt_search.c](../snippets/vector_interrupt/check_vsetvl_interrupt_search.c)
+- [snippets/manifests/vsetvl_interrupt_search.yaml](../snippets/manifests/vsetvl_interrupt_search.yaml)
+- [snippets/manifests/check_vsetvl_interrupt_search.yaml](../snippets/manifests/check_vsetvl_interrupt_search.yaml)
+- [suites/vsetvl_interrupt_search_poc.yaml](../suites/vsetvl_interrupt_search_poc.yaml)
 
 ### 测试与 runner 结果分类
 
 修改：
 
-- [tests/test_snippet_loading.py](/home/dfpmts/XS/framework/snippetgen-demo/tests/test_snippet_loading.py)
-- [tests/test_build_pipeline.py](/home/dfpmts/XS/framework/snippetgen-demo/tests/test_build_pipeline.py)
-- [tests/test_run_pipeline.py](/home/dfpmts/XS/framework/snippetgen-demo/tests/test_run_pipeline.py)
-- [targets/xiangshan-verilator/run_target.py](/home/dfpmts/XS/framework/snippetgen-demo/targets/xiangshan-verilator/run_target.py)
+- [tests/test_snippet_loading.py](../tests/test_snippet_loading.py)
+- [tests/test_build_pipeline.py](../tests/test_build_pipeline.py)
+- [tests/test_run_pipeline.py](../tests/test_run_pipeline.py)
+- [targets/xiangshan-verilator/run_target.py](../targets/xiangshan-verilator/run_target.py)
 
 补充了：
 

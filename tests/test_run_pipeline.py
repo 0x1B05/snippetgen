@@ -208,6 +208,24 @@ class RunPipelineTest(unittest.TestCase):
 
         self.assertEqual(emu_path, resolved)
 
+    def test_xiangshan_runner_does_not_infer_machine_specific_xs_env_path(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_no_default_env_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        with mock.patch.dict(
+            module.os.environ,
+            {"PATH": "/usr/bin:/bin"},
+            clear=True,
+        ):
+            env = module._xs_env()
+
+        self.assertNotIn("XS_PROJECT_ROOT", env)
+        self.assertNotIn("NOOP_HOME", env)
+        self.assertNotIn("NEMU_HOME", env)
+
     def test_xiangshan_runner_uses_xs_env_paths_and_diff_reference(self) -> None:
         module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
         spec = importlib.util.spec_from_file_location("xiangshan_run_target_real_env_test", module_path)

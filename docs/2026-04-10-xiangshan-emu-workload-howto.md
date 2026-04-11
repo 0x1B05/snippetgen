@@ -15,13 +15,21 @@ It covers:
 Always enter the XiangShan environment first:
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 ```
 
 This repository expects at least:
 
-- `NOOP_HOME=/home/dfpmts/XS/xs-env/XiangShan`
-- `NEMU_HOME=/home/dfpmts/XS/xs-env/NEMU`
+- `NOOP_HOME=$XS_PROJECT_ROOT/XiangShan`
+- `NEMU_HOME=$XS_PROJECT_ROOT/NEMU`
+
+`XS_PROJECT_ROOT` is expected to be the directory that contains:
+
+- `XiangShan/`
+- `NEMU/`
+- `nexus-am/`
+- `DRAMsim3/`
 
 Without that environment, the adapter may fail to find:
 
@@ -54,7 +62,8 @@ python3 generator/cli.py dump-plan suites/misaligned_split_store_search_poc.yaml
 Example:
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 ```
 
@@ -78,7 +87,8 @@ build/<suite>/runs/
 Example:
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 
 python3 generator/cli.py build suites/vsetvl_interrupt_path_poc.yaml
 
@@ -117,7 +127,8 @@ Optional, only when external XiangShan tracing is active:
 ### Real interrupt response
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/interrupt_response_poc.yaml --seed 4660
 ```
 
@@ -129,7 +140,8 @@ Expected:
 ### Path-oriented `vsetvl`
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 ```
 
@@ -141,7 +153,8 @@ Expected:
 ### Misaligned split-store abort on a pre-fix XiangShan tree
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 SNIPPETGEN_RUN_MAX_CYCLES=12000 SNIPPETGEN_RUN_MAX_INSTR=12000 \
 python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --seed 0 --timeout-sec 140
 ```
@@ -213,4 +226,4 @@ At the time of this document update:
 
 For a higher-level summary, see:
 
-- [`docs/release-notes-2026-04-11.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/release-notes-2026-04-11.md)
+- [`release-notes-2026-04-11.md`](release-notes-2026-04-11.md)

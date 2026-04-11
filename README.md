@@ -29,7 +29,8 @@ Artifacts are written to:
 ### 2. Run one suite on XiangShan `emu`
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 ```
 
@@ -98,7 +99,8 @@ Run artifacts are written to:
 ### Real interrupt response
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/interrupt_response_poc.yaml --seed 4660
 ```
 
@@ -111,7 +113,8 @@ Expected result:
 ### Path-oriented `vsetvl`
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 ```
 
@@ -125,7 +128,8 @@ Expected result:
 This case is intended for a XiangShan tree that still contains the pre-fix `sqNeedDeq` behavior.
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 SNIPPETGEN_RUN_MAX_CYCLES=12000 SNIPPETGEN_RUN_MAX_INSTR=12000 \
 python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --seed 0 --timeout-sec 140
 ```
@@ -140,7 +144,8 @@ Expected result on the pre-fix `emu`:
 
 The XiangShan adapter assumes:
 
-- `source /home/dfpmts/XS/xs-env/env.sh` has been executed
+- `SNIPPETGEN_XS_ENV_SH` points to your local `xs-env/env.sh`
+- `source "$SNIPPETGEN_XS_ENV_SH"` has been executed
 - `NOOP_HOME/build/verilator-compile/emu` is available
 - `NEMU_HOME/build/riscv64-nemu-interpreter-so` is available
 
@@ -184,19 +189,19 @@ build/<suite>/runs/
 
 ### Start here
 
-- [`docs/2026-04-10-xiangshan-emu-workload-howto.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-xiangshan-emu-workload-howto.md)
+- [`docs/2026-04-10-xiangshan-emu-workload-howto.md`](docs/2026-04-10-xiangshan-emu-workload-howto.md)
   - practical XiangShan `emu` build/run guide
-- [`docs/release-notes-2026-04-11.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/release-notes-2026-04-11.md)
+- [`docs/release-notes-2026-04-11.md`](docs/release-notes-2026-04-11.md)
   - what changed in this snapshot
 
 ### Investigation notes
 
-- [`docs/2026-04-10-vsetvl-hang-investigation-notes.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-vsetvl-hang-investigation-notes.md)
+- [`docs/2026-04-10-vsetvl-hang-investigation-notes.md`](docs/2026-04-10-vsetvl-hang-investigation-notes.md)
   - `vsetvl` and interrupt investigation trail
 
 ### Archived planning material
 
-- [`docs/archive/README.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/archive/README.md)
+- [`docs/archive/README.md`](docs/archive/README.md)
   - archived drafts, requirements, and implementation plans
 
 ## For Agents

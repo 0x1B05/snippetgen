@@ -39,6 +39,21 @@ class RepoLayoutTest(unittest.TestCase):
             with self.subTest(path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_dir())
 
+    def test_release_docs_do_not_embed_machine_specific_absolute_paths(self) -> None:
+        docs_to_check = [
+            ROOT / "README.md",
+            ROOT / "CHANGELOG.md",
+            ROOT / "docs" / "README.md",
+            ROOT / "docs" / "2026-04-10-xiangshan-emu-workload-howto.md",
+            ROOT / "docs" / "2026-04-10-vsetvl-hang-investigation-notes.md",
+            ROOT / "docs" / "release-notes-2026-04-11.md",
+        ]
+
+        for path in docs_to_check:
+            with self.subTest(path=path):
+                text = path.read_text()
+                self.assertNotIn("/home/dfpmts/", text)
+
 
 if __name__ == "__main__":
     unittest.main()

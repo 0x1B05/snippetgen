@@ -66,7 +66,8 @@ On a pre-fix XiangShan tree, the current `misaligned_split_store_search_poc` can
 Reference command:
 
 ```bash
-source /home/dfpmts/XS/xs-env/env.sh
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
 SNIPPETGEN_RUN_MAX_CYCLES=12000 SNIPPETGEN_RUN_MAX_INSTR=12000 \
 python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --seed 0 --timeout-sec 140
 ```
@@ -80,16 +81,16 @@ Expected result:
 
 ### Main entry points
 
-- [`README.md`](/home/dfpmts/XS/framework/snippetgen-demo/README.md)
-- [`docs/2026-04-10-xiangshan-emu-workload-howto.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-xiangshan-emu-workload-howto.md)
+- [`README.md`](../README.md)
+- [`2026-04-10-xiangshan-emu-workload-howto.md`](2026-04-10-xiangshan-emu-workload-howto.md)
 
 ### Investigation notes
 
-- [`docs/2026-04-10-vsetvl-hang-investigation-notes.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-vsetvl-hang-investigation-notes.md)
+- [`2026-04-10-vsetvl-hang-investigation-notes.md`](2026-04-10-vsetvl-hang-investigation-notes.md)
 
 ### Archived planning material
 
-- [`docs/archive/README.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/archive/README.md)
+- [`archive/README.md`](archive/README.md)
 
 ## External Coupling
 
@@ -99,5 +100,6 @@ If you want LightSSS wave dump on abort:
 
 - the external `emu` must be built with trace support
 - the external XiangShan `emu.cpp` must keep the local abort-wave patch
+- your local XiangShan environment should be provided via `SNIPPETGEN_XS_ENV_SH` or exported `XS_PROJECT_ROOT` / `NOOP_HOME` / `NEMU_HOME`
 
 The repository-side run adapter already passes `wave_path`; whether a wave file actually appears depends on that external build.

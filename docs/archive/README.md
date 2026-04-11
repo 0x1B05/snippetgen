@@ -25,6 +25,6 @@ This directory holds planning and draft material that is useful for historical c
 
 For normal usage, start from:
 
-- [`README.md`](/home/dfpmts/XS/framework/snippetgen-demo/README.md)
-- [`docs/2026-04-10-xiangshan-emu-workload-howto.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/2026-04-10-xiangshan-emu-workload-howto.md)
-- [`docs/release-notes-2026-04-11.md`](/home/dfpmts/XS/framework/snippetgen-demo/docs/release-notes-2026-04-11.md)
+- [`../../README.md`](../../README.md)
+- [`../2026-04-10-xiangshan-emu-workload-howto.md`](../2026-04-10-xiangshan-emu-workload-howto.md)
+- [`../release-notes-2026-04-11.md`](../release-notes-2026-04-11.md)
