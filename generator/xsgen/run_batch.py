@@ -136,7 +136,10 @@ def run_suite_batch(
     target_loader=load_run_target,
     run_batch_id: str | None = None,
     timeout_s: int | None = None,
+    jobs: int = 1,
 ) -> Path:
+    if jobs < 1:
+        raise ValueError(f"jobs must be positive: {jobs}")
     snippet_db = load_snippet_db(repo_root)
     base_suite = load_suite(suite_path)
     run_batch = run_batch_id or _default_run_batch_id()

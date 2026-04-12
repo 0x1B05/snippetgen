@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -652,6 +653,79 @@ class RunPipelineTest(unittest.TestCase):
                     str(seed_dir / "disasm"),
                     ledger["entries"][seed - 11]["disasm"],
                 )
+
+    def test_run_batch_preserves_input_seed_order_under_parallel_completion(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+        completion_order: list[int] = []
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                if artifacts.seed == 11:
+                    time.sleep(0.05)
+                else:
+                    time.sleep(0.01)
+                completion_order.append(artifacts.seed)
+                artifacts.stdout_log_path.write_text(f"seed {artifacts.seed}\n")
+                artifacts.stderr_log_path.write_text("")
+                return model.TargetRunResult(
+                    status="ran",
+                    labels=("built", "ran"),
+                    notes="",
+                    returncode=0,
+                )
+
+            return run_target
+
+        ledger_path = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(11, 12),
+            target_loader=fake_target_loader,
+            run_batch_id="parallel-order",
+            timeout_s=5,
+            jobs=2,
+        )
+
+        payload = json.loads(ledger_path.read_text())
+        self.assertEqual([12, 11], completion_order)
+        self.assertEqual([11, 12], [entry["seed"] for entry in payload["entries"]])
+
+    def test_run_batch_continues_other_runs_when_one_seed_errors(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+        seen: list[int] = []
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                seen.append(artifacts.seed)
+                artifacts.stdout_log_path.write_text("")
+                if artifacts.seed == 21:
+                    artifacts.stderr_log_path.write_text("simulated run failure\n")
+                    raise RuntimeError("simulated run failure")
+                artifacts.stderr_log_path.write_text("")
+                return model.TargetRunResult(
+                    status="ran",
+                    labels=("built", "ran"),
+                    notes="",
+                    returncode=0,
+                )
+
+            return run_target
+
+        ledger_path = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(21, 22),
+            target_loader=fake_target_loader,
+            run_batch_id="parallel-failure",
+            timeout_s=5,
+            jobs=2,
+        )
+
+        payload = json.loads(ledger_path.read_text())
+        self.assertEqual([21, 22], sorted(seen))
+        self.assertEqual(["error", "ran"], [entry["status"] for entry in payload["entries"]])
 
     def test_failed_run_still_writes_meta_and_logs(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
