@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from pathlib import Path
 import json
@@ -187,6 +188,27 @@ def _error_result(*, notes: str) -> TargetRunResult:
     )
 
 
+def _prepared_error_entry(*, prepared: _PreparedSeedRun, notes: str) -> RunEntry:
+    prepared.stderr_log_path.write_text(f"{notes}\n")
+    return _completed_entry(
+        prepared=prepared,
+        target_result=_error_result(notes=notes),
+    )
+
+
+def _execute_prepared_seed(
+    *,
+    prepared: _PreparedSeedRun,
+    target_runner,
+    timeout_s: int | None,
+) -> RunEntry:
+    try:
+        target_result = target_runner(artifacts=prepared.run_artifacts, timeout_s=timeout_s)
+    except Exception as exc:
+        return _prepared_error_entry(prepared=prepared, notes=str(exc))
+    return _completed_entry(prepared=prepared, target_result=target_result)
+
+
 def _write_run_ledger(
     *,
     suite_name: str,
@@ -230,7 +252,8 @@ def run_suite_batch(
     ledger_path = batch_root / "batch_meta.json"
     batch_root.mkdir(parents=True, exist_ok=True)
     target_runner = target_loader(repo_root, base_suite.target)
-    entries: list[RunEntry] = []
+    prepared_runs: list[_PreparedSeedRun] = []
+    entries_by_seed: dict[int, RunEntry] = {}
 
     for seed in seed_values:
         suite = replace(base_suite, seed=seed)
@@ -253,7 +276,6 @@ def run_suite_batch(
                 run_meta_path=run_meta_path,
                 wave_path=wave_path,
             )
-            target_result = target_runner(artifacts=prepared.run_artifacts, timeout_s=timeout_s)
         except Exception as exc:
             prepared = _PreparedSeedRun(
                 seed=seed,
@@ -275,15 +297,39 @@ def run_suite_batch(
                 run_meta_path=run_meta_path,
                 wave_path=wave_path,
             )
-            prepared.stderr_log_path.write_text(f"{exc}\n")
-            target_result = _error_result(notes=str(exc))
+            entry = _prepared_error_entry(prepared=prepared, notes=str(exc))
+            _write_run_meta(entry)
+            entries_by_seed[seed] = entry
+            continue
 
-        entry = _completed_entry(
-            prepared=prepared,
-            target_result=target_result,
-        )
-        _write_run_meta(entry)
-        entries.append(entry)
+        prepared_runs.append(prepared)
+
+    if jobs == 1:
+        for prepared in prepared_runs:
+            entry = _execute_prepared_seed(
+                prepared=prepared,
+                target_runner=target_runner,
+                timeout_s=timeout_s,
+            )
+            _write_run_meta(entry)
+            entries_by_seed[entry.seed] = entry
+    elif prepared_runs:
+        with ThreadPoolExecutor(max_workers=min(jobs, len(prepared_runs))) as executor:
+            future_map = {
+                executor.submit(
+                    _execute_prepared_seed,
+                    prepared=prepared,
+                    target_runner=target_runner,
+                    timeout_s=timeout_s,
+                ): prepared.seed
+                for prepared in prepared_runs
+            }
+            for future in as_completed(future_map):
+                entry = future.result()
+                _write_run_meta(entry)
+                entries_by_seed[entry.seed] = entry
+
+    entries = [entries_by_seed[seed] for seed in seed_values]
 
     return _write_run_ledger(
         suite_name=base_suite.name,
