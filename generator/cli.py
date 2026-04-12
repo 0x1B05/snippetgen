@@ -77,12 +77,15 @@ def cmd_run(args: argparse.Namespace) -> int:
         seed_values = normalize_seeds(seed=args.seed, seeds=args.seeds, seed_range=args.seed_range)
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
+    if args.jobs < 1:
+        raise SystemExit("jobs must be positive")
     ledger_path = run_suite_batch(
         repo_root=REPO_ROOT,
         suite_path=REPO_ROOT / Path(args.suite),
         seed_values=seed_values,
         run_batch_id=args.batch_id,
         timeout_s=args.timeout_sec,
+        jobs=args.jobs,
     )
     print(ledger_path)
     return _run_exit_code(ledger_path)
@@ -110,6 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
     seed_group.add_argument("--seeds")
     seed_group.add_argument("--seed-range")
     run_parser.add_argument("--batch-id")
+    run_parser.add_argument("--jobs", type=int, default=1)
     run_parser.add_argument("--timeout-sec", type=int)
     run_parser.set_defaults(handler=cmd_run)
 

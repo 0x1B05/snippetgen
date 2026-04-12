@@ -80,6 +80,37 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml", kwargs["suite_path"])
         self.assertEqual((4, 5, 6), kwargs["seed_values"])
         self.assertIsNone(kwargs["run_batch_id"])
+        self.assertEqual(1, kwargs["jobs"])
+
+    def test_cli_run_passes_jobs_to_batch_runner(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [{"seed": 4, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(
+                    [
+                        "run",
+                        "suites/vsetvl_interrupt_path_poc.yaml",
+                        "--seeds",
+                        "4,5,6",
+                        "--jobs",
+                        "3",
+                    ]
+                )
+
+        self.assertEqual(0, rc)
+        self.assertEqual(3, run_mock.call_args.kwargs["jobs"])
 
     def test_cli_run_invokes_batch_with_single_seed_and_range(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -119,6 +150,14 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(0, rc)
         self.assertEqual((8, 9, 10), run_mock.call_args.kwargs["seed_values"])
         self.assertIsNone(run_mock.call_args.kwargs["run_batch_id"])
+
+    def test_cli_run_rejects_non_positive_jobs(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with self.assertRaises(SystemExit) as ctx:
+            cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7", "--jobs", "0"])
+
+        self.assertEqual("jobs must be positive", str(ctx.exception))
 
     def test_cli_run_passes_explicit_batch_id(self) -> None:
         cli = importlib.import_module("generator.cli")
