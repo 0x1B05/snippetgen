@@ -1,16 +1,29 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, replace
 from pathlib import Path
 import json
 import uuid
 
 from generator.xsgen.emitter import emit_harness
-from generator.xsgen.model import RunEntry, RunLedger, RunSeedArtifacts, TargetRunResult
+from generator.xsgen.model import BuildArtifact, ComposePlan, RunEntry, RunLedger, RunSeedArtifacts, TargetRunResult
 from generator.xsgen.run_target import load_run_target
 from generator.xsgen.snippet_db import load_snippet_db
 from generator.xsgen.suite_loader import build_compose_plan, load_suite
 from generator.xsgen.toolchain import artifact_paths_for_run_seed, build_artifacts
+
+
+@dataclass(frozen=True)
+class _PreparedSeedRun:
+    seed: int
+    plan: ComposePlan
+    artifact: BuildArtifact
+    run_artifacts: RunSeedArtifacts
+    stdout_log_path: Path
+    stderr_log_path: Path
+    run_meta_path: Path
+    wave_path: Path
 
 
 def _require_non_negative_seed(value: int) -> int:
@@ -104,6 +117,98 @@ def _write_run_meta(entry: RunEntry) -> None:
     entry.run_meta_path.write_text(json.dumps(_entry_payload(entry), indent=2, sort_keys=True))
 
 
+def _completed_entry(
+    *,
+    prepared: _PreparedSeedRun,
+    target_result: TargetRunResult,
+) -> RunEntry:
+    return RunEntry(
+        suite_name=prepared.plan.suite_name,
+        target=prepared.plan.target,
+        run_batch=prepared.run_artifacts.run_batch,
+        seed=prepared.seed,
+        artifact_dir=prepared.artifact.build_dir,
+        elf_path=prepared.artifact.elf_path,
+        bin_path=prepared.artifact.bin_path,
+        disasm_path=prepared.artifact.disasm_path,
+        stdout_log_path=prepared.stdout_log_path,
+        stderr_log_path=prepared.stderr_log_path,
+        run_meta_path=prepared.run_meta_path,
+        wave_path=prepared.wave_path,
+        status=target_result.status,
+        labels=target_result.labels,
+        notes=target_result.notes,
+        returncode=target_result.returncode,
+    )
+
+
+def _prepare_seed_run(
+    *,
+    repo_root: Path,
+    plan: ComposePlan,
+    artifact: BuildArtifact,
+    run_batch: str,
+    seed: int,
+    stdout_log_path: Path,
+    stderr_log_path: Path,
+    run_meta_path: Path,
+    wave_path: Path,
+) -> _PreparedSeedRun:
+    emit_harness(plan, artifact.generated_suite_path)
+    build_artifacts(repo_root, plan, artifact)
+    run_artifacts = RunSeedArtifacts(
+        suite_name=plan.suite_name,
+        target=plan.target,
+        seed=seed,
+        run_batch=run_batch,
+        build_artifact=artifact,
+        stdout_log_path=stdout_log_path,
+        stderr_log_path=stderr_log_path,
+        run_meta_path=run_meta_path,
+        wave_path=wave_path,
+    )
+    return _PreparedSeedRun(
+        seed=seed,
+        plan=plan,
+        artifact=artifact,
+        run_artifacts=run_artifacts,
+        stdout_log_path=stdout_log_path,
+        stderr_log_path=stderr_log_path,
+        run_meta_path=run_meta_path,
+        wave_path=wave_path,
+    )
+
+
+def _error_result(*, notes: str) -> TargetRunResult:
+    return TargetRunResult(
+        status="error",
+        labels=("error",),
+        notes=notes,
+        returncode=None,
+    )
+
+
+def _prepared_error_entry(*, prepared: _PreparedSeedRun, notes: str) -> RunEntry:
+    prepared.stderr_log_path.write_text(f"{notes}\n")
+    return _completed_entry(
+        prepared=prepared,
+        target_result=_error_result(notes=notes),
+    )
+
+
+def _execute_prepared_seed(
+    *,
+    prepared: _PreparedSeedRun,
+    target_runner,
+    timeout_s: int | None,
+) -> RunEntry:
+    try:
+        target_result = target_runner(artifacts=prepared.run_artifacts, timeout_s=timeout_s)
+    except Exception as exc:
+        return _prepared_error_entry(prepared=prepared, notes=str(exc))
+    return _completed_entry(prepared=prepared, target_result=target_result)
+
+
 def _write_run_ledger(
     *,
     suite_name: str,
@@ -136,7 +241,10 @@ def run_suite_batch(
     target_loader=load_run_target,
     run_batch_id: str | None = None,
     timeout_s: int | None = None,
+    jobs: int = 1,
 ) -> Path:
+    if jobs < 1:
+        raise ValueError(f"jobs must be positive: {jobs}")
     snippet_db = load_snippet_db(repo_root)
     base_suite = load_suite(suite_path)
     run_batch = run_batch_id or _default_run_batch_id()
@@ -144,7 +252,8 @@ def run_suite_batch(
     ledger_path = batch_root / "batch_meta.json"
     batch_root.mkdir(parents=True, exist_ok=True)
     target_runner = target_loader(repo_root, base_suite.target)
-    entries: list[RunEntry] = []
+    prepared_runs: list[_PreparedSeedRun] = []
+    entries_by_seed: dict[int, RunEntry] = {}
 
     for seed in seed_values:
         suite = replace(base_suite, seed=seed)
@@ -155,51 +264,72 @@ def run_suite_batch(
         run_meta_path = artifact.build_dir / "run_meta.json"
         wave_path = artifact.build_dir / "lightsss-wave"
         _ensure_log_files(stdout_log_path, stderr_log_path)
-
         try:
-            emit_harness(plan, artifact.generated_suite_path)
-            build_artifacts(repo_root, plan, artifact)
-            run_artifacts = RunSeedArtifacts(
-                suite_name=plan.suite_name,
-                target=plan.target,
-                seed=seed,
+            prepared = _prepare_seed_run(
+                repo_root=repo_root,
+                plan=plan,
+                artifact=artifact,
                 run_batch=run_batch,
-                build_artifact=artifact,
+                seed=seed,
                 stdout_log_path=stdout_log_path,
                 stderr_log_path=stderr_log_path,
                 run_meta_path=run_meta_path,
                 wave_path=wave_path,
             )
-            target_result = target_runner(artifacts=run_artifacts, timeout_s=timeout_s)
         except Exception as exc:
-            stderr_log_path.write_text(f"{exc}\n")
-            target_result = TargetRunResult(
-                status="error",
-                labels=("error",),
-                notes=str(exc),
-                returncode=None,
+            prepared = _PreparedSeedRun(
+                seed=seed,
+                plan=plan,
+                artifact=artifact,
+                run_artifacts=RunSeedArtifacts(
+                    suite_name=plan.suite_name,
+                    target=plan.target,
+                    seed=seed,
+                    run_batch=run_batch,
+                    build_artifact=artifact,
+                    stdout_log_path=stdout_log_path,
+                    stderr_log_path=stderr_log_path,
+                    run_meta_path=run_meta_path,
+                    wave_path=wave_path,
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+                wave_path=wave_path,
             )
+            entry = _prepared_error_entry(prepared=prepared, notes=str(exc))
+            _write_run_meta(entry)
+            entries_by_seed[seed] = entry
+            continue
 
-        entry = RunEntry(
-            suite_name=plan.suite_name,
-            target=plan.target,
-            run_batch=run_batch,
-            seed=seed,
-            artifact_dir=artifact.build_dir,
-            elf_path=artifact.elf_path,
-            bin_path=artifact.bin_path,
-            disasm_path=artifact.disasm_path,
-            stdout_log_path=stdout_log_path,
-            stderr_log_path=stderr_log_path,
-            run_meta_path=run_meta_path,
-            wave_path=wave_path,
-            status=target_result.status,
-            labels=target_result.labels,
-            notes=target_result.notes,
-            returncode=target_result.returncode,
-        )
-        _write_run_meta(entry)
-        entries.append(entry)
+        prepared_runs.append(prepared)
+
+    if jobs == 1:
+        for prepared in prepared_runs:
+            entry = _execute_prepared_seed(
+                prepared=prepared,
+                target_runner=target_runner,
+                timeout_s=timeout_s,
+            )
+            _write_run_meta(entry)
+            entries_by_seed[entry.seed] = entry
+    elif prepared_runs:
+        with ThreadPoolExecutor(max_workers=min(jobs, len(prepared_runs))) as executor:
+            future_map = {
+                executor.submit(
+                    _execute_prepared_seed,
+                    prepared=prepared,
+                    target_runner=target_runner,
+                    timeout_s=timeout_s,
+                ): prepared.seed
+                for prepared in prepared_runs
+            }
+            for future in as_completed(future_map):
+                entry = future.result()
+                _write_run_meta(entry)
+                entries_by_seed[entry.seed] = entry
+
+    entries = [entries_by_seed[seed] for seed in seed_values]
 
     return _write_run_ledger(
         suite_name=base_suite.name,

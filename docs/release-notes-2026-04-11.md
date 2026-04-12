@@ -18,6 +18,7 @@ The repository now supports:
 - `python3 generator/cli.py run ... --seeds <A,B,C>`
 - `python3 generator/cli.py run ... --seed-range <L:R>`
 - `python3 generator/cli.py run ... --batch-id <NAME>`
+- `python3 generator/cli.py run ... --jobs <N>`
 
 Run artifacts are isolated per seed under:
 
@@ -30,6 +31,13 @@ and summarized by:
 ```text
 build/<suite>/runs/<batch_id>/batch_meta.json
 ```
+
+Parallel seed exploration keeps the current batch contract intact:
+
+- default remains serial with `--jobs 1`
+- only the `run` phase executes concurrently
+- per-seed outputs remain isolated
+- the final batch ledger stays ordered by input seed
 
 ### 2. Real XiangShan `emu` integration
 

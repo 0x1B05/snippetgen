@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -80,6 +81,37 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml", kwargs["suite_path"])
         self.assertEqual((4, 5, 6), kwargs["seed_values"])
         self.assertIsNone(kwargs["run_batch_id"])
+        self.assertEqual(1, kwargs["jobs"])
+
+    def test_cli_run_passes_jobs_to_batch_runner(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "batch",
+                        "entries": [{"seed": 4, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(
+                    [
+                        "run",
+                        "suites/vsetvl_interrupt_path_poc.yaml",
+                        "--seeds",
+                        "4,5,6",
+                        "--jobs",
+                        "3",
+                    ]
+                )
+
+        self.assertEqual(0, rc)
+        self.assertEqual(3, run_mock.call_args.kwargs["jobs"])
 
     def test_cli_run_invokes_batch_with_single_seed_and_range(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -120,6 +152,14 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual((8, 9, 10), run_mock.call_args.kwargs["seed_values"])
         self.assertIsNone(run_mock.call_args.kwargs["run_batch_id"])
 
+    def test_cli_run_rejects_non_positive_jobs(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with self.assertRaises(SystemExit) as ctx:
+            cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7", "--jobs", "0"])
+
+        self.assertEqual("jobs must be positive", str(ctx.exception))
+
     def test_cli_run_passes_explicit_batch_id(self) -> None:
         cli = importlib.import_module("generator.cli")
 
@@ -149,6 +189,39 @@ class RunPipelineTest(unittest.TestCase):
 
         self.assertEqual(0, rc)
         self.assertEqual("repro_4658", run_mock.call_args.kwargs["run_batch_id"])
+
+    def test_cli_run_passes_jobs_and_batch_id_together(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "parallel-demo",
+                        "entries": [{"seed": 1, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(
+                    [
+                        "run",
+                        "suites/vsetvl_interrupt_path_poc.yaml",
+                        "--seeds",
+                        "1,2",
+                        "--jobs",
+                        "2",
+                        "--batch-id",
+                        "parallel-demo",
+                    ]
+                )
+
+        self.assertEqual(0, rc)
+        self.assertEqual(2, run_mock.call_args.kwargs["jobs"])
+        self.assertEqual("parallel-demo", run_mock.call_args.kwargs["run_batch_id"])
 
     def test_cli_run_reports_clean_seed_validation_error(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -613,6 +686,79 @@ class RunPipelineTest(unittest.TestCase):
                     str(seed_dir / "disasm"),
                     ledger["entries"][seed - 11]["disasm"],
                 )
+
+    def test_run_batch_preserves_input_seed_order_under_parallel_completion(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+        completion_order: list[int] = []
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                if artifacts.seed == 11:
+                    time.sleep(0.05)
+                else:
+                    time.sleep(0.01)
+                completion_order.append(artifacts.seed)
+                artifacts.stdout_log_path.write_text(f"seed {artifacts.seed}\n")
+                artifacts.stderr_log_path.write_text("")
+                return model.TargetRunResult(
+                    status="ran",
+                    labels=("built", "ran"),
+                    notes="",
+                    returncode=0,
+                )
+
+            return run_target
+
+        ledger_path = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(11, 12),
+            target_loader=fake_target_loader,
+            run_batch_id="parallel-order",
+            timeout_s=5,
+            jobs=2,
+        )
+
+        payload = json.loads(ledger_path.read_text())
+        self.assertEqual([12, 11], completion_order)
+        self.assertEqual([11, 12], [entry["seed"] for entry in payload["entries"]])
+
+    def test_run_batch_continues_other_runs_when_one_seed_errors(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+        seen: list[int] = []
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                seen.append(artifacts.seed)
+                artifacts.stdout_log_path.write_text("")
+                if artifacts.seed == 21:
+                    artifacts.stderr_log_path.write_text("simulated run failure\n")
+                    raise RuntimeError("simulated run failure")
+                artifacts.stderr_log_path.write_text("")
+                return model.TargetRunResult(
+                    status="ran",
+                    labels=("built", "ran"),
+                    notes="",
+                    returncode=0,
+                )
+
+            return run_target
+
+        ledger_path = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(21, 22),
+            target_loader=fake_target_loader,
+            run_batch_id="parallel-failure",
+            timeout_s=5,
+            jobs=2,
+        )
+
+        payload = json.loads(ledger_path.read_text())
+        self.assertEqual([21, 22], sorted(seen))
+        self.assertEqual(["error", "ran"], [entry["status"] for entry in payload["entries"]])
 
     def test_failed_run_still_writes_meta_and_logs(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
