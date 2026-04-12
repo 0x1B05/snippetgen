@@ -149,6 +149,7 @@ def build_artifacts(
 
     for index, source_path in enumerate(runtime_sources(repo_root), start=1):
         object_path = object_dir / f"{index:02d}_{source_path.stem}.o"
+        object_dir.mkdir(parents=True, exist_ok=True)
         compile_cmd = [
             toolchain["gcc"],
             *compile_flags,
@@ -172,6 +173,7 @@ def build_artifacts(
     source_index = len(object_paths) + 1
     for source_path in unique_plan_sources(plan):
         object_path = object_dir / f"{source_index:02d}_{source_path.stem}.o"
+        object_dir.mkdir(parents=True, exist_ok=True)
         compile_cmd = [
             toolchain["gcc"],
             *compile_flags,
@@ -194,6 +196,7 @@ def build_artifacts(
         source_index += 1
 
     generated_object = object_dir / f"{source_index:02d}_{artifact.generated_suite_path.stem}.o"
+    object_dir.mkdir(parents=True, exist_ok=True)
     generated_compile_cmd = [
         toolchain["gcc"],
         *compile_flags,

@@ -710,15 +710,27 @@ class RunPipelineTest(unittest.TestCase):
 
             return run_target
 
-        ledger_path = run_batch.run_suite_batch(
-            repo_root=ROOT,
-            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
-            seed_values=(11, 12),
-            target_loader=fake_target_loader,
-            run_batch_id="parallel-order",
-            timeout_s=5,
-            jobs=2,
-        )
+        def fake_emit(plan, generated_suite_path):
+            generated_suite_path.parent.mkdir(parents=True, exist_ok=True)
+            generated_suite_path.write_text("int main(void) { return 0; }\n")
+
+        def fake_build(repo_root, plan, artifact):
+            artifact.build_dir.mkdir(parents=True, exist_ok=True)
+            artifact.elf_path.write_bytes(b"\x00")
+            artifact.bin_path.write_bytes(b"\x00")
+            artifact.disasm_path.write_text("")
+
+        with mock.patch.object(run_batch, "emit_harness", side_effect=fake_emit):
+            with mock.patch.object(run_batch, "build_artifacts", side_effect=fake_build):
+                ledger_path = run_batch.run_suite_batch(
+                    repo_root=ROOT,
+                    suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+                    seed_values=(11, 12),
+                    target_loader=fake_target_loader,
+                    run_batch_id="parallel-order",
+                    timeout_s=5,
+                    jobs=2,
+                )
 
         payload = json.loads(ledger_path.read_text())
         self.assertEqual([12, 11], completion_order)
@@ -746,15 +758,27 @@ class RunPipelineTest(unittest.TestCase):
 
             return run_target
 
-        ledger_path = run_batch.run_suite_batch(
-            repo_root=ROOT,
-            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
-            seed_values=(21, 22),
-            target_loader=fake_target_loader,
-            run_batch_id="parallel-failure",
-            timeout_s=5,
-            jobs=2,
-        )
+        def fake_emit(plan, generated_suite_path):
+            generated_suite_path.parent.mkdir(parents=True, exist_ok=True)
+            generated_suite_path.write_text("int main(void) { return 0; }\n")
+
+        def fake_build(repo_root, plan, artifact):
+            artifact.build_dir.mkdir(parents=True, exist_ok=True)
+            artifact.elf_path.write_bytes(b"\x00")
+            artifact.bin_path.write_bytes(b"\x00")
+            artifact.disasm_path.write_text("")
+
+        with mock.patch.object(run_batch, "emit_harness", side_effect=fake_emit):
+            with mock.patch.object(run_batch, "build_artifacts", side_effect=fake_build):
+                ledger_path = run_batch.run_suite_batch(
+                    repo_root=ROOT,
+                    suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+                    seed_values=(21, 22),
+                    target_loader=fake_target_loader,
+                    run_batch_id="parallel-failure",
+                    timeout_s=5,
+                    jobs=2,
+                )
 
         payload = json.loads(ledger_path.read_text())
         self.assertEqual([21, 22], sorted(seen))

@@ -189,6 +189,7 @@ def _error_result(*, notes: str) -> TargetRunResult:
 
 
 def _prepared_error_entry(*, prepared: _PreparedSeedRun, notes: str) -> RunEntry:
+    prepared.stderr_log_path.parent.mkdir(parents=True, exist_ok=True)
     prepared.stderr_log_path.write_text(f"{notes}\n")
     return _completed_entry(
         prepared=prepared,
