@@ -190,6 +190,39 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual(0, rc)
         self.assertEqual("repro_4658", run_mock.call_args.kwargs["run_batch_id"])
 
+    def test_cli_run_passes_jobs_and_batch_id_together(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "run_ledger.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "parallel-demo",
+                        "entries": [{"seed": 1, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(
+                    [
+                        "run",
+                        "suites/vsetvl_interrupt_path_poc.yaml",
+                        "--seeds",
+                        "1,2",
+                        "--jobs",
+                        "2",
+                        "--batch-id",
+                        "parallel-demo",
+                    ]
+                )
+
+        self.assertEqual(0, rc)
+        self.assertEqual(2, run_mock.call_args.kwargs["jobs"])
+        self.assertEqual("parallel-demo", run_mock.call_args.kwargs["run_batch_id"])
+
     def test_cli_run_reports_clean_seed_validation_error(self) -> None:
         cli = importlib.import_module("generator.cli")
 
