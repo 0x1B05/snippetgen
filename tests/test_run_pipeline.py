@@ -46,10 +46,15 @@ class RunPipelineTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "non-negative"):
             run_batch.normalize_seeds(seed=None, seeds=None, seed_range="-1:1")
 
-    def test_default_run_batch_id_is_stable(self) -> None:
+    def test_default_run_batch_id_is_unique_batch_scoped(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
 
-        self.assertEqual("stable", run_batch._default_run_batch_id())
+        batch_a = run_batch._default_run_batch_id()
+        batch_b = run_batch._default_run_batch_id()
+
+        self.assertTrue(batch_a.startswith("batch_"))
+        self.assertTrue(batch_b.startswith("batch_"))
+        self.assertNotEqual(batch_a, batch_b)
 
     def test_cli_run_invokes_batch_with_normalized_seeds(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -74,6 +79,7 @@ class RunPipelineTest(unittest.TestCase):
         kwargs = run_mock.call_args.kwargs
         self.assertEqual(ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml", kwargs["suite_path"])
         self.assertEqual((4, 5, 6), kwargs["seed_values"])
+        self.assertIsNone(kwargs["run_batch_id"])
 
     def test_cli_run_invokes_batch_with_single_seed_and_range(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -94,6 +100,7 @@ class RunPipelineTest(unittest.TestCase):
                 rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed", "7"])
         self.assertEqual(0, rc)
         self.assertEqual((7,), run_mock.call_args.kwargs["seed_values"])
+        self.assertIsNone(run_mock.call_args.kwargs["run_batch_id"])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ledger_path = Path(tmpdir) / "run_ledger.json"
@@ -111,6 +118,37 @@ class RunPipelineTest(unittest.TestCase):
                 rc = cli.main(["run", "suites/vsetvl_interrupt_path_poc.yaml", "--seed-range", "8:10"])
         self.assertEqual(0, rc)
         self.assertEqual((8, 9, 10), run_mock.call_args.kwargs["seed_values"])
+        self.assertIsNone(run_mock.call_args.kwargs["run_batch_id"])
+
+    def test_cli_run_passes_explicit_batch_id(self) -> None:
+        cli = importlib.import_module("generator.cli")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ledger_path = Path(tmpdir) / "batch_meta.json"
+            ledger_path.write_text(
+                json.dumps(
+                    {
+                        "suite": "demo",
+                        "target": "xiangshan-verilator",
+                        "run_batch": "repro_4658",
+                        "entries": [{"seed": 4658, "status": "ran", "labels": ["built", "ran"]}],
+                    }
+                )
+            )
+            with mock.patch.object(cli, "run_suite_batch", return_value=ledger_path) as run_mock:
+                rc = cli.main(
+                    [
+                        "run",
+                        "suites/vsetvl_interrupt_path_poc.yaml",
+                        "--seed",
+                        "4658",
+                        "--batch-id",
+                        "repro_4658",
+                    ]
+                )
+
+        self.assertEqual(0, rc)
+        self.assertEqual("repro_4658", run_mock.call_args.kwargs["run_batch_id"])
 
     def test_cli_run_reports_clean_seed_validation_error(self) -> None:
         cli = importlib.import_module("generator.cli")
@@ -519,7 +557,7 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual("abort", result.status)
         self.assertIn("abort", result.labels)
 
-    def test_run_batch_writes_seed_isolated_artifacts_and_ledger(self) -> None:
+    def test_run_batch_writes_seed_isolated_artifacts_and_batch_meta(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")
         model = importlib.import_module("generator.xsgen.model")
 
@@ -549,14 +587,16 @@ class RunPipelineTest(unittest.TestCase):
 
         self.assertTrue(ledger_path.is_file())
         ledger = json.loads(ledger_path.read_text())
+        batch_root = self.run_root / "test-batch"
         self.assertEqual("vsetvl_interrupt_path_poc", ledger["suite"])
         self.assertEqual("xiangshan-verilator", ledger["target"])
         self.assertEqual("test-batch", ledger["run_batch"])
         self.assertEqual([11, 12], [entry["seed"] for entry in ledger["entries"]])
-        self.assertEqual(str(self.run_root / "run_ledger.json"), str(ledger_path))
+        self.assertEqual(str(batch_root / "batch_meta.json"), str(ledger_path))
+        self.assertFalse((self.run_root / "run_ledger.json").exists())
 
         for seed in (11, 12):
-            seed_dir = self.run_root / f"seed_{seed}"
+            seed_dir = batch_root / f"seed_{seed}"
             with self.subTest(seed=seed):
                 self.assertTrue((seed_dir / "generated_suite.c").is_file())
                 self.assertTrue((seed_dir / "test.elf").is_file())
@@ -598,10 +638,47 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual("error", ledger["entries"][0]["status"])
         self.assertIn("error", ledger["entries"][0]["labels"])
 
-        seed_dir = self.run_root / "seed_21"
+        seed_dir = self.run_root / "failing-batch" / "seed_21"
         self.assertTrue((seed_dir / "stdout.log").is_file())
         self.assertTrue((seed_dir / "stderr.log").is_file())
         self.assertTrue((seed_dir / "run_meta.json").is_file())
+
+    def test_run_batch_default_batch_id_avoids_shared_top_level_writes(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                artifacts.stdout_log_path.write_text("fake stdout\n")
+                artifacts.stderr_log_path.write_text("")
+                return model.TargetRunResult(
+                    status="ran",
+                    labels=("built", "ran"),
+                    notes="",
+                    returncode=0,
+                )
+
+            return run_target
+
+        first = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(31,),
+            target_loader=fake_target_loader,
+        )
+        second = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(32,),
+            target_loader=fake_target_loader,
+        )
+
+        self.assertNotEqual(first, second)
+        self.assertEqual("batch_meta.json", first.name)
+        self.assertEqual("batch_meta.json", second.name)
+        self.assertTrue(first.parent.parent == self.run_root)
+        self.assertTrue(second.parent.parent == self.run_root)
+        self.assertFalse((self.run_root / "run_ledger.json").exists())
 
 
 if __name__ == "__main__":

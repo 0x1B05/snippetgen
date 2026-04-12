@@ -57,6 +57,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
 
         self.assertIn("void xsrt_enable_stimer(void);", intr_h)
         self.assertIn("void xsrt_timer_arm_delta(uint64_t cycles);", intr_h)
+        self.assertIn("void xsrt_timer_arm_periodic_delta(uint64_t cycles);", intr_h)
 
         self.assertIn("typedef struct {", snippet_h)
         self.assertIn("const char *id;", snippet_h)
@@ -70,11 +71,10 @@ class RuntimeSurfaceTest(unittest.TestCase):
         self.assertIn("main", start_s)
         self.assertRegex(start_s, r"\b(call|tail)\s+main\b")
 
-    def test_runtime_c_surfaces_compile_and_runner_executes(self) -> None:
+    def test_runtime_c_surfaces_cross_compile(self) -> None:
         smoke_c = textwrap.dedent(
             """
             #include <stdint.h>
-            #include <stdio.h>
 
             #include "xsrt_env.h"
             #include "xsrt_csr.h"
@@ -149,30 +149,37 @@ class RuntimeSurfaceTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             smoke_path = Path(tmpdir) / "runtime_smoke.c"
-            binary_path = Path(tmpdir) / "runtime_smoke"
+            object_path = Path(tmpdir) / "runtime_smoke.o"
             smoke_path.write_text(smoke_c)
 
+            toolchain = __import__("generator.xsgen.toolchain", fromlist=["detect_toolchain"])
+            gcc = toolchain.detect_toolchain()["gcc"]
             compile_cmd = [
-                "cc",
+                gcc,
                 "-std=c11",
                 "-Wall",
                 "-Wextra",
                 "-Werror",
+                "-O2",
+                "-march=rv64gcv",
+                "-mabi=lp64d",
+                "-mcmodel=medany",
+                "-ffreestanding",
+                "-fno-asynchronous-unwind-tables",
+                "-fno-builtin",
+                "-fno-stack-protector",
+                "-fno-tree-vectorize",
+                "-fno-tree-slp-vectorize",
                 "-I",
                 str(ROOT / "runtime/include"),
                 "-I",
                 str(ROOT / "snippets/include"),
                 "-I",
                 str(ROOT / "runtime/platform/xiangshan"),
+                "-c",
                 str(smoke_path),
-                str(ROOT / "runtime/src/xsrt_env.c"),
-                str(ROOT / "runtime/src/xsrt_csr.c"),
-                str(ROOT / "runtime/src/xsrt_trap.c"),
-                str(ROOT / "runtime/src/xsrt_intr.c"),
-                str(ROOT / "runtime/src/xsrt_snippet.c"),
-                str(ROOT / "runtime/platform/xiangshan/xsrt_platform.c"),
                 "-o",
-                str(binary_path),
+                str(object_path),
             ]
             compile_result = subprocess.run(
                 compile_cmd,
@@ -185,14 +192,6 @@ class RuntimeSurfaceTest(unittest.TestCase):
                 compile_result.returncode,
                 msg=compile_result.stderr,
             )
-
-            run_result = subprocess.run(
-                [str(binary_path)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(0, run_result.returncode, msg=run_result.stderr)
 
 
 if __name__ == "__main__":

@@ -3,11 +3,12 @@
 .type _start, @function
 
 #define MSTATUS_FS 0x00006000
+#define MSTATUS_VS 0x00000600
 #define STKSHIFT 17
 
 _start:
   mv s0, zero
-  li a0, MSTATUS_FS & (MSTATUS_FS >> 1)
+  li a0, MSTATUS_FS | MSTATUS_VS
   csrs mstatus, a0
   csrwi fcsr, 0
 

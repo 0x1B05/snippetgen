@@ -81,6 +81,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         repo_root=REPO_ROOT,
         suite_path=REPO_ROOT / Path(args.suite),
         seed_values=seed_values,
+        run_batch_id=args.batch_id,
         timeout_s=args.timeout_sec,
     )
     print(ledger_path)
@@ -108,6 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     seed_group.add_argument("--seed", type=int)
     seed_group.add_argument("--seeds")
     seed_group.add_argument("--seed-range")
+    run_parser.add_argument("--batch-id")
     run_parser.add_argument("--timeout-sec", type=int)
     run_parser.set_defaults(handler=cmd_run)
 

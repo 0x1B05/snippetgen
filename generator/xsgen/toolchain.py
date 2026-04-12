@@ -32,7 +32,7 @@ def artifact_paths_for_run_seed(
     run_batch: str,
     seed: int,
 ) -> BuildArtifact:
-    build_dir = repo_root / "build" / suite_name / "runs" / f"seed_{seed}"
+    build_dir = repo_root / "build" / suite_name / "runs" / run_batch / f"seed_{seed}"
     return _artifact_paths_for_build_dir(build_dir, suite_name)
 
 
@@ -115,13 +115,15 @@ def build_artifacts(
 ) -> BuildArtifact:
     compile_flags = [
         "-O2",
-        "-march=rv64gc",
+        "-march=rv64gcv",
         "-mabi=lp64d",
         "-mcmodel=medany",
         "-ffreestanding",
         "-fno-asynchronous-unwind-tables",
         "-fno-builtin",
         "-fno-stack-protector",
+        "-fno-tree-vectorize",
+        "-fno-tree-slp-vectorize",
     ]
     include_flags = [
         "-I",

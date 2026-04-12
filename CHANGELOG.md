@@ -8,11 +8,16 @@
   - `--seed`
   - `--seeds`
   - `--seed-range`
-- Stable run artifact layout under `build/<suite>/runs/seed_<N>/`
-- Structured `run_ledger.json` and per-seed `run_meta.json`
+  - `--batch-id`
+- Batch-scoped run artifact layout under `build/<suite>/runs/<batch_id>/seed_<N>/`
+- Structured `batch_meta.json` and per-seed `run_meta.json`
 - `disasm` artifact beside every built `test.elf`
 - Real XiangShan `emu` adapter
 - LightSSS-aware abort workflow for external XiangShan integration
+- RISC-V-only runtime/snippet surface
+- Runtime-level vector enable in `_start`
+- Periodic timer mode for `vsetvl` interrupt search
+- `X1/X2/X4/X8` `vsetvl` macro bundles for the search workload
 
 ### New Suites
 
@@ -27,6 +32,8 @@
 - Real timer interrupt response is now observable in a dedicated suite
 - Path-oriented `vsetvl` workloads can be built and run end to end
 - The misaligned split-store search workload can reproduce an `abort` path on a pre-fix XiangShan tree
+- `vsetvl_interrupt_search_poc` can reproduce a ROB assertion on a pre-fix XiangShan tree through the repository common path using:
+  - `python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default`
 
 ### Documentation
 

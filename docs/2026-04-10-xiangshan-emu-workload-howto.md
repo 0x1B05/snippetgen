@@ -7,7 +7,7 @@ It covers:
 - how to build a workload
 - how to run it on XiangShan `emu`
 - where artifacts are written
-- how to interpret `run_ledger.json`
+- how to interpret `batch_meta.json`
 - how to check LightSSS wave dumping on abort
 
 ## 1. Preconditions
@@ -67,19 +67,35 @@ source "$SNIPPETGEN_XS_ENV_SH"
 python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 ```
 
+This is the preferred path for all normal runs. Manual `emu` invocation is for debugging and tests only.
+
 This path:
 
 - rebuilds the suite for that seed
 - runs XiangShan `emu`
 - keeps stdout/stderr
-- writes a structured ledger
+- writes a structured batch summary plus per-seed metadata
 
-Current run layout is stable, without timestamp directories:
+Current run layout is batch-scoped and collision-free:
 
 ```text
 build/<suite>/runs/
-  run_ledger.json
-  seed_<N>/
+  <batch_id>/
+    batch_meta.json
+    seed_<N>/
+```
+
+If you need a stable repro directory, set `--batch-id` explicitly:
+
+```bash
+python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default
+```
+
+Equivalent `make` shortcuts:
+
+```bash
+make repro-vsetvl
+make repro-split-store
 ```
 
 ## 4. Run XiangShan `emu` Manually
@@ -108,19 +124,19 @@ Expected normal-success markers:
 
 ## 5. Where To Look After A Run
 
-For `suite=<suite>` and `seed=<N>`:
+For `suite=<suite>`, `batch=<batch_id>`, and `seed=<N>`:
 
-- `build/<suite>/runs/run_ledger.json`
-- `build/<suite>/runs/seed_<N>/stdout.log`
-- `build/<suite>/runs/seed_<N>/stderr.log`
-- `build/<suite>/runs/seed_<N>/run_meta.json`
-- `build/<suite>/runs/seed_<N>/disasm`
-- `build/<suite>/runs/seed_<N>/test.elf`
-- `build/<suite>/runs/seed_<N>/test.bin`
+- `build/<suite>/runs/<batch_id>/batch_meta.json`
+- `build/<suite>/runs/<batch_id>/seed_<N>/stdout.log`
+- `build/<suite>/runs/<batch_id>/seed_<N>/stderr.log`
+- `build/<suite>/runs/<batch_id>/seed_<N>/run_meta.json`
+- `build/<suite>/runs/<batch_id>/seed_<N>/disasm`
+- `build/<suite>/runs/<batch_id>/seed_<N>/test.elf`
+- `build/<suite>/runs/<batch_id>/seed_<N>/test.bin`
 
 Optional, only when external XiangShan tracing is active:
 
-- `build/<suite>/runs/seed_<N>/lightsss-wave`
+- `build/<suite>/runs/<batch_id>/seed_<N>/lightsss-wave`
 
 ## 6. Repro Cases
 
@@ -134,7 +150,7 @@ python3 generator/cli.py run suites/interrupt_response_poc.yaml --seed 4660
 
 Expected:
 
-- `status: "ran"`
+- `batch_meta.json` shows `status: "ran"`
 - `labels` include `good_trap`
 
 ### Path-oriented `vsetvl`
@@ -147,7 +163,7 @@ python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 
 Expected:
 
-- `status: "ran"`
+- `batch_meta.json` shows `status: "ran"`
 - `labels` include `good_trap`
 
 ### Misaligned split-store abort on a pre-fix XiangShan tree
@@ -161,9 +177,23 @@ python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --see
 
 Expected on the pre-fix `emu`:
 
-- `run_ledger.json` shows `status: "abort"`
+- `batch_meta.json` shows `status: "abort"`
 - `stdout.log` shows difftest mismatch on the detector loads
 - if LightSSS trace support is enabled in the external XiangShan tree, `lightsss-wave` is dumped beside the logs
+
+### `vsetvl` assertion repro on a pre-fix XiangShan tree
+
+```bash
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
+python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default
+```
+
+Observed result:
+
+- `build/vsetvl_interrupt_search_poc/runs/repro_4658_default/batch_meta.json` shows `status: "abort"`
+- `stdout.log` contains `Assertion failed at .../Rob.sv:87863`
+- `seed_4658/lightsss-wave` appears when the external XiangShan LightSSS patch is active
 
 ## 7. LightSSS Wave Dump Notes
 
@@ -221,8 +251,9 @@ This is the most useful case for LightSSS replay and wave dump.
 At the time of this document update:
 
 - `disasm` is emitted beside every `test.elf`
-- run directories are stable, no timestamp in the path
+- run directories are batch-scoped and support explicit `--batch-id`
 - the misaligned split-store search case has a reproducible `abort` path on a pre-fix XiangShan tree
+- the `vsetvl` interrupt search case has a common-path `abort` repro at `--seed 4658 --batch-id repro_4658_default`
 
 For a higher-level summary, see:
 

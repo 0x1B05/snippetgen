@@ -17,17 +17,18 @@ The repository now supports:
 - `python3 generator/cli.py run ... --seed <N>`
 - `python3 generator/cli.py run ... --seeds <A,B,C>`
 - `python3 generator/cli.py run ... --seed-range <L:R>`
+- `python3 generator/cli.py run ... --batch-id <NAME>`
 
 Run artifacts are isolated per seed under:
 
 ```text
-build/<suite>/runs/seed_<N>/
+build/<suite>/runs/<batch_id>/seed_<N>/
 ```
 
 and summarized by:
 
 ```text
-build/<suite>/runs/run_ledger.json
+build/<suite>/runs/<batch_id>/batch_meta.json
 ```
 
 ### 2. Real XiangShan `emu` integration
@@ -74,8 +75,24 @@ python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --see
 
 Expected result:
 
-- `run_ledger.json` records `status: "abort"`
+- `batch_meta.json` records `status: "abort"`
 - `stdout.log` contains difftest mismatch and `ABORT`
+
+### 6. Common-path `vsetvl` abort with LightSSS output
+
+On a pre-fix XiangShan tree, the current `vsetvl_interrupt_search_poc` can `ABORT` through the repository common path:
+
+```bash
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
+python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default
+```
+
+Observed result:
+
+- `build/vsetvl_interrupt_search_poc/runs/repro_4658_default/batch_meta.json` records `status: "abort"`
+- `stdout.log` contains `Assertion failed at .../Rob.sv:87863`
+- `seed_4658/lightsss-wave` is emitted when the external XiangShan LightSSS patch is active
 
 ## Documentation Layout
 

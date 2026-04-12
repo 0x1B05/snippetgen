@@ -10,7 +10,6 @@ static uint8_t split_store_arena[32768] __attribute__((aligned(64)));
 
 static unsigned long split_store_skid(unsigned long lane, unsigned long count) {
   for (unsigned long index = 0; index < count; ++index) {
-#if defined(__riscv)
     __asm__ volatile(
         "addi %[lane], %[lane], 3\n"
         "xori %[lane], %[lane], 11\n"
@@ -18,9 +17,6 @@ static unsigned long split_store_skid(unsigned long lane, unsigned long count) {
         : [lane] "+r"(lane)
         :
         : "memory");
-#else
-    lane = ((lane + 3u) ^ 11u) & 255u;
-#endif
   }
 
   return lane;
@@ -28,17 +24,11 @@ static unsigned long split_store_skid(unsigned long lane, unsigned long count) {
 
 
 static void split_store_write64(uint8_t *ptr, uint64_t value) {
-#if defined(__riscv)
   __asm__ volatile(
       "sd %0, 0(%1)"
       :
       : "r"(value), "r"(ptr)
       : "memory");
-#else
-  for (unsigned long index = 0; index < 8u; ++index) {
-    ptr[index] = (uint8_t) (value >> (8u * index));
-  }
-#endif
 }
 
 
@@ -69,7 +59,6 @@ static void split_store_probe_high_fragment(
     uint32_t *word32,
     uint16_t *half16,
     uint8_t *byte8) {
-#if defined(__riscv)
   unsigned long word_value;
   unsigned long half_value;
   unsigned long byte_value;
@@ -84,11 +73,6 @@ static void split_store_probe_high_fragment(
   *word32 = (uint32_t) word_value;
   *half16 = (uint16_t) half_value;
   *byte8 = (uint8_t) byte_value;
-#else
-  *word32 = *(uint32_t *) fragment_base;
-  *half16 = *(uint16_t *) (fragment_base + 4u);
-  *byte8 = *(uint8_t *) (fragment_base + 6u);
-#endif
 }
 
 

@@ -13,18 +13,11 @@ static int unaligned_load_run(xsrt_env_t *env) {
     return -1;
   }
 
-#if defined(__riscv)
   __asm__ volatile(
       "lw %0, 0(%1)"
       : "=r"(value)
       : "r"(ptr)
       : "memory");
-#else
-  value = ((uint32_t) ptr[0]) |
-          ((uint32_t) ptr[1] << 8) |
-          ((uint32_t) ptr[2] << 16) |
-          ((uint32_t) ptr[3] << 24);
-#endif
 
   env->snippet_id = value;
   xsrt_csr_write(7u, value);

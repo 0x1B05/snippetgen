@@ -43,16 +43,12 @@ static int interrupt_response_wait_run(xsrt_env_t *env) {
       env->flags |= (uint64_t) XS_INTERRUPT_FLAG_TRAP_OBSERVED;
       return 0;
     }
-#if defined(__riscv)
     __asm__ volatile("csrr %0, mstatus" : "=r"(last_mstatus));
     __asm__ volatile("csrr %0, mie" : "=r"(last_mie));
     __asm__ volatile("csrr %0, mip" : "=r"(last_mip));
     last_time = *XS_INTERRUPT_RTC_ADDR;
     last_compare = *XS_INTERRUPT_MTIMECMP_ADDR;
     __asm__ volatile("nop" ::: "memory");
-#else
-    __asm__ volatile("" ::: "memory");
-#endif
   }
 
   if ((last_mstatus & (uint64_t) XS_INTERRUPT_MSTATUS_MIE) == 0u) {

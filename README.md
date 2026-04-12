@@ -36,13 +36,26 @@ python3 generator/cli.py run suites/vsetvl_interrupt_path_poc.yaml --seed 4660
 
 Run artifacts are written to:
 
-- `build/<suite>/runs/run_ledger.json`
-- `build/<suite>/runs/seed_<N>/test.elf`
-- `build/<suite>/runs/seed_<N>/test.bin`
-- `build/<suite>/runs/seed_<N>/disasm`
-- `build/<suite>/runs/seed_<N>/stdout.log`
-- `build/<suite>/runs/seed_<N>/stderr.log`
-- `build/<suite>/runs/seed_<N>/run_meta.json`
+- `build/<suite>/runs/<batch_id>/batch_meta.json`
+- `build/<suite>/runs/<batch_id>/seed_<N>/test.elf`
+- `build/<suite>/runs/<batch_id>/seed_<N>/test.bin`
+- `build/<suite>/runs/<batch_id>/seed_<N>/disasm`
+- `build/<suite>/runs/<batch_id>/seed_<N>/stdout.log`
+- `build/<suite>/runs/<batch_id>/seed_<N>/stderr.log`
+- `build/<suite>/runs/<batch_id>/seed_<N>/run_meta.json`
+
+If you need a stable, reusable path for a repro case, pass `--batch-id`:
+
+```bash
+python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default
+```
+
+Equivalent `make` entry points:
+
+```bash
+make repro-vsetvl
+make repro-split-store
+```
 
 ## Repository Map
 
@@ -90,7 +103,7 @@ Run artifacts are written to:
 ### Investigation and bug-hunting suites
 
 - `suites/vsetvl_interrupt_search_poc.yaml`
-  - one-shot timer plus dense `vsetvl zero, zero, zero` search workload
+  - periodic timer plus dense bundled `vsetvl zero, zero, zero` search workload
 - `suites/misaligned_split_store_search_poc.yaml`
   - misaligned split-store forwarding search workload for the `sqNeedDeq` bug class
 
@@ -106,7 +119,7 @@ python3 generator/cli.py run suites/interrupt_response_poc.yaml --seed 4660
 
 Expected result:
 
-- `run_ledger.json` records `status: "ran"`
+- `batch_meta.json` records `status: "ran"`
 - `stdout.log` reaches `HIT GOOD TRAP`
 - the check snippet confirms that a real timer interrupt was observed
 
@@ -136,9 +149,27 @@ python3 generator/cli.py run suites/misaligned_split_store_search_poc.yaml --see
 
 Expected result on the pre-fix `emu`:
 
-- `run_ledger.json` records `status: "abort"`
+- `batch_meta.json` records `status: "abort"`
 - `stdout.log` shows difftest mismatch on the detector loads
 - if LightSSS tracing is enabled in the external XiangShan tree, `seed_0/lightsss-wave` is dumped beside the logs
+
+### `vsetvl` ROB assertion on a pre-fix XiangShan tree
+
+Use the repository common path directly:
+
+```bash
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
+python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default
+```
+
+Observed result:
+
+- `build/vsetvl_interrupt_search_poc/runs/repro_4658_default/batch_meta.json` records `status: "abort"`
+- `stdout.log` contains:
+  - `Assertion failed at .../Rob.sv:87863`
+  - `ABORT at pc = 0x800002ac`
+- `seed_4658/lightsss-wave` is dumped beside the logs when the external XiangShan LightSSS patch is active
 
 ## XiangShan Run Requirements
 
@@ -173,16 +204,17 @@ build/<suite>/
 
 ```text
 build/<suite>/runs/
-  run_ledger.json
-  seed_<N>/
-    generated_suite.c
-    test.elf
-    test.bin
-    disasm
-    stdout.log
-    stderr.log
-    run_meta.json
-    lightsss-wave        # only when external XiangShan tracing is active
+  <batch_id>/
+    batch_meta.json
+    seed_<N>/
+      generated_suite.c
+      test.elf
+      test.bin
+      disasm
+      stdout.log
+      stderr.log
+      run_meta.json
+      lightsss-wave        # only on abort/bad-trap when external XiangShan tracing is active
 ```
 
 ## Documentation Index

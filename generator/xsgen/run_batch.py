@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 import json
+import uuid
 
 from generator.xsgen.emitter import emit_harness
 from generator.xsgen.model import RunEntry, RunLedger, RunSeedArtifacts, TargetRunResult
@@ -68,7 +69,7 @@ def normalize_seeds(
 
 
 def _default_run_batch_id() -> str:
-    return "stable"
+    return f"batch_{uuid.uuid4().hex[:12]}"
 
 
 def _ensure_log_files(stdout_log_path: Path, stderr_log_path: Path) -> None:
@@ -139,8 +140,9 @@ def run_suite_batch(
     snippet_db = load_snippet_db(repo_root)
     base_suite = load_suite(suite_path)
     run_batch = run_batch_id or _default_run_batch_id()
-    ledger_path = (repo_root / "build" / base_suite.name / "runs" / "run_ledger.json").resolve()
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    batch_root = (repo_root / "build" / base_suite.name / "runs" / run_batch).resolve()
+    ledger_path = batch_root / "batch_meta.json"
+    batch_root.mkdir(parents=True, exist_ok=True)
     target_runner = target_loader(repo_root, base_suite.target)
     entries: list[RunEntry] = []
 

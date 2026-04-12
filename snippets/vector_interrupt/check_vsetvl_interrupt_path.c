@@ -1,12 +1,8 @@
 #include <stdint.h>
 
 #include "xs_snippet.h"
+#include "xs_interrupt_response.h"
 #include "xs_vsetvl_interrupt_path.h"
-
-
-enum {
-  XS_VSETVL_FLAG_TIMER_ARMED = 0x10u,
-};
 
 
 static int check_vsetvl_interrupt_path_check(xsrt_env_t *env) {
@@ -14,7 +10,7 @@ static int check_vsetvl_interrupt_path_check(xsrt_env_t *env) {
     return -1;
   }
 
-  if ((env->flags & (uint64_t) XS_VSETVL_FLAG_TIMER_ARMED) == 0u) {
+  if ((env->flags & (uint64_t) XS_INTERRUPT_FLAG_TIMER_ARMED) == 0u) {
     return 61;
   }
 

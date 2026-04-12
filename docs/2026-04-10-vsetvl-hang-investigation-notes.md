@@ -53,10 +53,11 @@
 - [snippets/vector_interrupt/vsetvl_interrupt_search.c](../snippets/vector_interrupt/vsetvl_interrupt_search.c)
 - [snippets/vector_interrupt/check_vsetvl_interrupt_search.c](../snippets/vector_interrupt/check_vsetvl_interrupt_search.c)
 
-搜索版经历了两个阶段：
+搜索版经历了多个阶段：
 
 1. 早期版本：每轮重 arm timer，再打一次 `vsetvl`
 2. 当前版本：**先 arm 一次较小 timer，再进入大量 `vsetvl zero, zero, zero` 密集循环**
+3. 后续版本：runtime 级 `VS` 打开、RISC-V-only surface、periodic timer re-arm、`X1/X2/X4/X8` `vsetvl` 宏堆叠
 
 第二种更接近这次讨论里确认的方法：
 
@@ -65,7 +66,16 @@
 
 ### 4. 已观测到主 ROB 指针不变量断言
 
-在当前 one-shot timer + dense `vsetvl` 模型下，`seed = 0x1234` 的搜索 workload 不再是 `good trap`，而是直接命中 XiangShan 内部断言：
+在搜索 workload 的多个版本中，已经观测到会直接命中 XiangShan 内部断言的 case。其中一个稳定的 common-path 复现是：
+
+- `python3 generator/cli.py run suites/vsetvl_interrupt_search_poc.yaml --seed 4658 --batch-id repro_4658_default`
+
+其结果位于：
+
+- `build/vsetvl_interrupt_search_poc/runs/repro_4658_default/batch_meta.json`
+- `build/vsetvl_interrupt_search_poc/runs/repro_4658_default/seed_4658/stdout.log`
+
+日志中直接出现：
 
 - `Assertion failed at $NOOP_HOME/build/rtl/Rob.sv:87867`
 
@@ -125,7 +135,7 @@
 
 - [runtime/arch/riscv64/trap.S](../runtime/arch/riscv64/trap.S)
   - 实现真实 trap entry
-  - 当前采用 `mscratch` + machine timer one-shot fast path
+  - 当前采用 `mscratch` + machine timer fast path，并支持 periodic re-arm
 - [runtime/src/xsrt_intr.c](../runtime/src/xsrt_intr.c)
   - 真实设置 `mtvec/mscratch/mie/mstatus`
   - 真实写 `mtimecmp`
@@ -197,7 +207,7 @@
   - `HIT BAD TRAP`
   - 某些 seed 接近 timeout
 
-#### 当前 one-shot timer + dense `vsetvl` 模型
+#### 旧版 one-shot timer + dense `vsetvl` 模型
 
 - `seed = 0x1234`
   - 结果：XiangsShan 内部断言
@@ -208,6 +218,15 @@
   - 结果：`timeout after 180s`
   - stdout 为空
   - 当前是最值得进一步抓波形的候选
+
+#### 当前 periodic timer + `X8` `vsetvl` 宏堆叠模型
+
+- common path 已支持通过 `--batch-id` 固定复现目录
+- `seed = 4658`
+  - 结果：`ABORT`
+  - 断言点：`Rob.sv:87863`
+  - common-path 目录：`build/vsetvl_interrupt_search_poc/runs/repro_4658_default/seed_4658/`
+  - 在启用外部 XiangShan LightSSS patch 的情况下，`lightsss-wave` 已成功落盘
 
 ## 这轮调查里踩过的坑
 
@@ -252,6 +271,6 @@
    - 目标：确认它是否接近真实 hang，而不是单纯长时间运行
 
 3. 如果需要继续做 seed 搜索，优先保留当前模型：
-   - 单次小 timer arm
-   - 大量 `vsetvl zero, zero, zero`
-   - 不要回退到“每轮重 arm”的模型
+   - periodic timer re-arm
+   - `X8` `vsetvl` 宏堆叠
+   - common path + 显式 `--batch-id`

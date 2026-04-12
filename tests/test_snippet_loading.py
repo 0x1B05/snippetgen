@@ -108,16 +108,28 @@ class SnippetLoadingTest(unittest.TestCase):
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
+            toolchain = importlib.import_module("generator.xsgen.toolchain")
+            gcc = toolchain.detect_toolchain()["gcc"]
             for relative_path in snippet_sources:
                 src_path = ROOT / relative_path
                 out_path = Path(tmpdir) / (src_path.stem + ".o")
                 result = subprocess.run(
                     [
-                        "cc",
+                        gcc,
                         "-std=c11",
                         "-Wall",
                         "-Wextra",
                         "-Werror",
+                        "-O2",
+                        "-march=rv64gcv",
+                        "-mabi=lp64d",
+                        "-mcmodel=medany",
+                        "-ffreestanding",
+                        "-fno-asynchronous-unwind-tables",
+                        "-fno-builtin",
+                        "-fno-stack-protector",
+                        "-fno-tree-vectorize",
+                        "-fno-tree-slp-vectorize",
                         "-I",
                         str(ROOT / "runtime/include"),
                         "-I",
@@ -469,16 +481,34 @@ class SnippetLoadingTest(unittest.TestCase):
 
     def test_unaligned_load_riscv_path_uses_real_word_load(self) -> None:
         source = (ROOT / "snippets/scalar_load_legality/unaligned_load.c").read_text()
-        self.assertIn("__riscv", source)
         self.assertIn('"lw %0, 0(%1)"', source)
 
-    def test_vsetvl_search_source_arms_single_timer_before_dense_loop(self) -> None:
+    def test_vsetvl_search_source_arms_periodic_timer_before_dense_loop(self) -> None:
         source = (ROOT / "snippets/vector_interrupt/vsetvl_interrupt_search.c").read_text()
 
         self.assertEqual(1, source.count("xsrt_enable_stimer();"))
-        self.assertEqual(1, source.count("xsrt_timer_arm_delta("))
+        self.assertEqual(1, source.count("xsrt_timer_arm_periodic_delta("))
+        self.assertIn("#define XS_VSETVL_X1()", source)
+        self.assertIn("#define XS_VSETVL_X2()", source)
+        self.assertIn("#define XS_VSETVL_X4()", source)
+        self.assertIn("#define XS_VSETVL_X8()", source)
+        self.assertIn("XS_VSETVL_X8();", source)
+        self.assertIn('iterations = 256u + (unsigned long) ((env->seed >> 4) & 0x7fu);', source)
+        self.assertIn('xsrt_timer_arm_periodic_delta(8u + (uint64_t) ((env->seed >> 13) & 0x7u));', source)
+        self.assertNotIn("__riscv", source)
+
+    def test_vsetvl_path_source_uses_direct_vsetvl_without_local_arch_toggle(self) -> None:
+        source = (ROOT / "snippets/vector_interrupt/vsetvl_interrupt_path.c").read_text()
+
         self.assertIn("vsetvl zero, zero, zero", source)
-        self.assertLess(source.index("xsrt_timer_arm_delta("), source.rindex("for (unsigned long index = 0;"))
+        self.assertNotIn("__riscv", source)
+
+    def test_runtime_entry_source_sets_fs_and_vs(self) -> None:
+        source = (ROOT / "runtime/arch/riscv64/start.S").read_text()
+
+        self.assertIn("MSTATUS_VS", source)
+        self.assertIn("MSTATUS_FS", source)
+        self.assertIn("csrs mstatus", source)
 
     def test_split_store_search_source_loads_high_half_first_for_diagnosis(self) -> None:
         source = (ROOT / "snippets/store_forward/misaligned_split_store_search.c").read_text()
