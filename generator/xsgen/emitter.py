@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from generator.xsgen.model import ComposePlan
+from generator.xsgen.program_harness import emit_program_wrapper
 
 
 def descriptor_symbol(snippet_id: str) -> str:
@@ -22,10 +23,19 @@ def emit_harness(plan: ComposePlan, output_path: Path) -> Path:
         "",
     ]
 
-    for snippet_id in plan.snippet_ids:
-        lines.append(
-            f"extern const xsrt_snippet_desc_t {descriptor_symbol(snippet_id)};"
-        )
+    emitted_wrappers: set[str] = set()
+    for snippet in plan.snippets:
+        if snippet.id in emitted_wrappers:
+            continue
+        if snippet.kind == "am_program":
+            if '#include "xsam/program_snippet.h"' not in lines:
+                lines.insert(2, '#include "xsam/program_snippet.h"')
+            lines.extend(emit_program_wrapper(snippet))
+        else:
+            lines.append(
+                f"extern const xsrt_snippet_desc_t {descriptor_symbol(snippet.id)};"
+            )
+        emitted_wrappers.add(snippet.id)
 
     lines.extend(
         [

@@ -5,12 +5,14 @@ import re
 
 import yaml
 
+from generator.xsgen.am_program_loader import load_am_program_entry
 from generator.xsgen.model import SnippetSpec
 
 
 REQUIRED_FIELDS = ("id", "kind", "lang", "sources")
 SNIPPET_ID_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SUPPORTED_LANGS = {"c", "asm"}
+SUPPORTED_KINDS = {"proc", "am_program"}
 
 
 def _require_mapping(data: object, path: Path) -> dict:
@@ -35,12 +37,14 @@ def load_manifest(path: Path, repo_root: Path) -> SnippetSpec:
         raise ValueError(f"{path} field 'id' must be a non-empty string")
     if SNIPPET_ID_RE.fullmatch(snippet_id) is None:
         raise ValueError(f"{path} invalid snippet id: {snippet_id}")
-    if kind != "proc":
+    if kind not in SUPPORTED_KINDS:
         raise ValueError(f"{path} kind '{kind}' not implemented in ELF-first PoC")
     if not isinstance(lang, str) or not lang:
         raise ValueError(f"{path} field 'lang' must be a non-empty string")
     if lang not in SUPPORTED_LANGS:
         raise ValueError(f"{path} unsupported snippet language: {lang}")
+    if kind == "am_program" and lang != "c":
+        raise ValueError(f"{path} AM program snippets currently require lang: c")
     if not isinstance(raw_sources, list) or not raw_sources:
         raise ValueError(f"{path} field 'sources' must be a non-empty list")
 
@@ -57,11 +61,16 @@ def load_manifest(path: Path, repo_root: Path) -> SnippetSpec:
             raise ValueError(f"{path} source does not exist: {raw_source}")
         resolved_sources.append(resolved)
 
+    entry = None
+    if kind == "am_program":
+        entry = load_am_program_entry(data, path)
+
     return SnippetSpec(
         id=snippet_id,
         kind=kind,
         lang=lang,
         sources=tuple(resolved_sources),
+        entry=entry,
     )
 
 

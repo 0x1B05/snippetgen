@@ -2,6 +2,7 @@
 
 #include "xs_snippet.h"
 #include "xs_interrupt_response.h"
+#include "xsrt_intr.h"
 
 enum {
   XS_INTERRUPT_WAIT_SPINS = 1024u,
@@ -14,10 +15,6 @@ enum {
   XS_INTERRUPT_MIE_MTIE = 1u << 7,
   XS_INTERRUPT_MIP_MTIP = 1u << 7,
 };
-
-#define XS_INTERRUPT_RTC_ADDR ((volatile uint64_t *) 0x3800bff8ull)
-#define XS_INTERRUPT_MTIMECMP_ADDR ((volatile uint64_t *) 0x38004000ull)
-
 
 static int interrupt_response_wait_run(xsrt_env_t *env) {
   volatile xsrt_env_t *shared_env;
@@ -46,8 +43,8 @@ static int interrupt_response_wait_run(xsrt_env_t *env) {
     __asm__ volatile("csrr %0, mstatus" : "=r"(last_mstatus));
     __asm__ volatile("csrr %0, mie" : "=r"(last_mie));
     __asm__ volatile("csrr %0, mip" : "=r"(last_mip));
-    last_time = *XS_INTERRUPT_RTC_ADDR;
-    last_compare = *XS_INTERRUPT_MTIMECMP_ADDR;
+    last_time = xsrt_timer_read_uptime();
+    last_compare = xsrt_timer_read_compare();
     __asm__ volatile("nop" ::: "memory");
   }
 

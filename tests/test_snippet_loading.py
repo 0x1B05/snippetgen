@@ -63,6 +63,65 @@ SPLIT_STORE_FORWARD_FILES = [
     "suites/misaligned_split_store_search_poc.yaml",
 ]
 
+EXAMPLE_FILES = [
+    "snippets/examples/demo_mark_flag.c",
+    "snippets/examples/check_demo_mark_flag.c",
+    "snippets/manifests/demo_mark_flag.yaml",
+    "snippets/manifests/check_demo_mark_flag.yaml",
+    "suites/demo_mark_flag_poc.yaml",
+]
+
+PREFETCHW_FILES = [
+    "snippets/include/xs_prefetchw.h",
+    "snippets/cbo/prefetchw_tl_denied_fault.c",
+    "snippets/cbo/check_prefetchw_tl_denied_fault.c",
+    "snippets/manifests/prefetchw_tl_denied_fault.yaml",
+    "snippets/manifests/check_prefetchw_tl_denied_fault.yaml",
+    "suites/prefetchw_tl_denied_fault_poc.yaml",
+]
+
+AM_PROGRAM_FILES = [
+    "snippets/programs/am_hello_main.c",
+    "snippets/manifests/am_hello_main.yaml",
+    "suites/am_hello_main_poc.yaml",
+]
+
+AM_TIMER_PROGRAM_FILES = [
+    "snippets/programs/am_timer_event_main.c",
+    "snippets/manifests/am_timer_event_main.yaml",
+    "suites/am_timer_event_poc.yaml",
+]
+
+NEXUS_CPUTEST_PORT_FILES = [
+    "snippets/programs/nexus_cputest_unalign_main.c",
+    "snippets/programs/nexus_cputest_load_store_main.c",
+    "snippets/manifests/nexus_cputest_unalign_main.yaml",
+    "snippets/manifests/nexus_cputest_load_store_main.yaml",
+    "suites/nexus_cputest_unalign_poc.yaml",
+    "suites/nexus_cputest_load_store_poc.yaml",
+]
+
+NEXUS_MEMSCAN_PORT_FILES = [
+    "snippets/programs/nexus_memscan_access_fault_main.c",
+    "snippets/programs/nexus_memscan_fetch_fault_main.c",
+    "snippets/programs/nexus_memscan_hugepage_access_fault_main.c",
+    "snippets/programs/nexus_memscan_hugepage_atom_fault_main.c",
+    "snippets/programs/nexus_memscan_hugepage_main.c",
+    "snippets/programs/nexus_memscan_page_fault_main.c",
+    "snippets/manifests/nexus_memscan_access_fault_main.yaml",
+    "snippets/manifests/nexus_memscan_fetch_fault_main.yaml",
+    "snippets/manifests/nexus_memscan_hugepage_access_fault_main.yaml",
+    "snippets/manifests/nexus_memscan_hugepage_atom_fault_main.yaml",
+    "snippets/manifests/nexus_memscan_hugepage_main.yaml",
+    "snippets/manifests/nexus_memscan_page_fault_main.yaml",
+    "suites/nexus_memscan_access_fault_poc.yaml",
+    "suites/nexus_memscan_fetch_fault_poc.yaml",
+    "suites/nexus_memscan_hugepage_access_fault_poc.yaml",
+    "suites/nexus_memscan_hugepage_atom_fault_poc.yaml",
+    "suites/nexus_memscan_hugepage_poc.yaml",
+    "suites/nexus_memscan_page_fault_poc.yaml",
+]
+
 
 class SnippetLoadingTest(unittest.TestCase):
     def test_round2_files_exist(self) -> None:
@@ -90,6 +149,60 @@ class SnippetLoadingTest(unittest.TestCase):
             with self.subTest(path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_file())
 
+    def test_example_files_exist(self) -> None:
+        for relative_path in EXAMPLE_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_prefetchw_tl_denied_fault_files_exist(self) -> None:
+        for relative_path in PREFETCHW_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_am_program_files_exist(self) -> None:
+        for relative_path in AM_PROGRAM_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_am_timer_program_files_exist(self) -> None:
+        for relative_path in AM_TIMER_PROGRAM_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_nexus_cputest_port_files_exist(self) -> None:
+        for relative_path in NEXUS_CPUTEST_PORT_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_nexus_memscan_port_files_exist(self) -> None:
+        for relative_path in NEXUS_MEMSCAN_PORT_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_prefetchw_default_target_addr_matches_default_emu_repro_window(self) -> None:
+        header_text = (ROOT / "snippets/include/xs_prefetchw.h").read_text()
+        self.assertIn("#define XS_PREFETCHW_TARGET_ADDR ((uint64_t) 0x90000000ull)", header_text)
+
+    def test_prefetchw_minimal_case_has_no_probe_loop_controls(self) -> None:
+        header_text = (ROOT / "snippets/include/xs_prefetchw.h").read_text()
+        self.assertNotIn("XS_PREFETCHW_PROBE_ROUNDS", header_text)
+        self.assertNotIn("XS_PREFETCHW_ISSUES_PER_ROUND", header_text)
+
+    def test_prefetchw_run_bad_traps_immediately_on_wrong_trap_shape(self) -> None:
+        source_text = (ROOT / "snippets/cbo/prefetchw_tl_denied_fault.c").read_text()
+        self.assertIn("XSRT_BAD_TRAP(XS_PREFETCHW_FAIL_LOAD_NO_TRAP);", source_text)
+        self.assertIn("XSRT_BAD_TRAP(XS_PREFETCHW_FAIL_LOAD_BAD_TRAP);", source_text)
+        self.assertIn("XSRT_BAD_TRAP(XS_PREFETCHW_FAIL_PREFETCH_TRAP);", source_text)
+
+    def test_prefetchw_trap_handler_advances_epc_by_instruction_length(self) -> None:
+        source_text = (ROOT / "snippets/cbo/prefetchw_tl_denied_fault.c").read_text()
+
+        self.assertIn("static uint64_t prefetchw_trap_insn_len(uint64_t epc)", source_text)
+        self.assertIn("const uint16_t insn_lo", source_text)
+        self.assertIn('((insn_lo & 0x3u) == 0x3u) ? 4u : 2u', source_text)
+        self.assertIn("frame->epc += prefetchw_trap_insn_len(frame->epc);", source_text)
+        self.assertNotIn("frame->epc += 4u;", source_text)
+
     def test_snippet_sources_compile(self) -> None:
         snippet_sources = [
             "snippets/core/init_basic_env.c",
@@ -105,6 +218,10 @@ class SnippetLoadingTest(unittest.TestCase):
             "snippets/interrupt/check_interrupt_response.c",
             "snippets/store_forward/misaligned_split_store_search.c",
             "snippets/store_forward/check_misaligned_split_store_search.c",
+            "snippets/examples/demo_mark_flag.c",
+            "snippets/examples/check_demo_mark_flag.c",
+            "snippets/cbo/prefetchw_tl_denied_fault.c",
+            "snippets/cbo/check_prefetchw_tl_denied_fault.c",
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -121,7 +238,51 @@ class SnippetLoadingTest(unittest.TestCase):
                         "-Wextra",
                         "-Werror",
                         "-O2",
-                        "-march=rv64gcv",
+                        "-march=rv64gcv_zicbop",
+                        "-mabi=lp64d",
+                        "-mcmodel=medany",
+                        "-ffreestanding",
+                        "-fno-asynchronous-unwind-tables",
+                        "-fno-builtin",
+                        "-fno-stack-protector",
+                        "-fno-tree-vectorize",
+                        "-fno-tree-slp-vectorize",
+                        "-I",
+                        str(ROOT / "runtime/include"),
+                        "-I",
+                        str(ROOT / "snippets/include"),
+                        "-c",
+                        str(src_path),
+                        "-o",
+                        str(out_path),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(0, result.returncode, msg=result.stderr)
+
+    def test_prefetchw_sources_compile(self) -> None:
+        snippet_sources = [
+            "snippets/cbo/prefetchw_tl_denied_fault.c",
+            "snippets/cbo/check_prefetchw_tl_denied_fault.c",
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            toolchain = importlib.import_module("generator.xsgen.toolchain")
+            gcc = toolchain.detect_toolchain()["gcc"]
+            for relative_path in snippet_sources:
+                src_path = ROOT / relative_path
+                out_path = Path(tmpdir) / (src_path.stem + ".o")
+                result = subprocess.run(
+                    [
+                        gcc,
+                        "-std=c11",
+                        "-Wall",
+                        "-Wextra",
+                        "-Werror",
+                        "-O2",
+                        "-march=rv64gcv_zicbop",
                         "-mabi=lp64d",
                         "-mcmodel=medany",
                         "-ffreestanding",
@@ -245,6 +406,46 @@ class SnippetLoadingTest(unittest.TestCase):
         )
         self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
 
+    def test_demo_mark_flag_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/demo_mark_flag_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "demo_mark_flag",
+                "check_demo_mark_flag",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_prefetchw_tl_denied_fault_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/prefetchw_tl_denied_fault_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "prefetchw_tl_denied_fault",
+                "check_prefetchw_tl_denied_fault",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
     def test_manifest_loader_rejects_missing_fields_and_stream_kind(self) -> None:
         snippet_db = importlib.import_module("generator.xsgen.snippet_db")
 
@@ -281,6 +482,36 @@ class SnippetLoadingTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "not implemented in ELF-first PoC"):
                 snippet_db.load_manifest(stream_manifest, tmp_root)
+
+    def test_manifest_loader_accepts_am_program_with_main_entry(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            source_path = tmp_root / "demo_main.c"
+            source_path.write_text("int main(void) { return 0; }\n")
+
+            manifest_path = tmp_root / "demo_program.yaml"
+            manifest_path.write_text(
+                textwrap.dedent(
+                    """
+                    id: demo_program
+                    kind: am_program
+                    lang: c
+                    entry: main
+                    sources:
+                      - demo_main.c
+                    """
+                ).strip()
+            )
+
+            snippet = snippet_db.load_manifest(manifest_path, tmp_root)
+
+            self.assertEqual("demo_program", snippet.id)
+            self.assertEqual("am_program", snippet.kind)
+            self.assertEqual("c", snippet.lang)
+            self.assertEqual("main", snippet.entry)
+            self.assertEqual((source_path.resolve(),), snippet.sources)
 
     def test_manifest_loader_rejects_unsupported_lang(self) -> None:
         snippet_db = importlib.import_module("generator.xsgen.snippet_db")

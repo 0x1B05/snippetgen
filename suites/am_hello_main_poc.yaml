@@ -1,0 +1,9 @@
+suite: am_hello_main_poc
+target: xiangshan-verilator
+seed: 51966
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - am_hello_main
+    - finish_check

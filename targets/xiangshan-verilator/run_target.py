@@ -11,7 +11,7 @@ from generator.xsgen.model import TargetRunResult
 DEFAULT_MAX_CYCLES = 20000
 DEFAULT_MAX_INSTR = 20000
 DEFAULT_TIMEOUT_SEC = 120
-DEFAULT_FORK_INTERVAL_SEC = 1
+DEFAULT_FORK_INTERVAL_SEC = 10
 
 
 def _xs_env() -> dict[str, str]:

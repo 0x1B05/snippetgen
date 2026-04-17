@@ -1,0 +1,6 @@
+id: nexus_cputest_load_store_main
+kind: am_program
+lang: c
+entry: main
+sources:
+  - snippets/programs/nexus_cputest_load_store_main.c

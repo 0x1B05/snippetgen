@@ -86,6 +86,16 @@ def runtime_sources(repo_root: Path) -> list[Path]:
         repo_root / "runtime" / "src" / "xsrt_trap.c",
         repo_root / "runtime" / "src" / "xsrt_intr.c",
         repo_root / "runtime" / "src" / "xsrt_snippet.c",
+        repo_root / "runtime" / "src" / "xsam_trm.c",
+        repo_root / "runtime" / "src" / "xsam_cte.c",
+        repo_root / "runtime" / "src" / "xsam_vme.c",
+        repo_root / "runtime" / "src" / "xsam_ioe.c",
+        repo_root / "runtime" / "src" / "xsam_program_snippet.c",
+        repo_root / "runtime" / "platform" / "xiangshan" / "xsam_xs_clint.c",
+        repo_root / "runtime" / "platform" / "xiangshan" / "xsam_xs_plic.c",
+        repo_root / "runtime" / "platform" / "xiangshan" / "xsam_xs_pma.c",
+        repo_root / "runtime" / "platform" / "xiangshan" / "xsam_xs_pmp.c",
+        repo_root / "runtime" / "platform" / "xiangshan" / "xsam_xs_cache.c",
         repo_root / "runtime" / "platform" / "xiangshan" / "xsrt_platform.c",
     ]
 
@@ -99,7 +109,8 @@ def unique_plan_sources(plan: ComposePlan) -> list[Path]:
     ordered: list[Path] = []
 
     for snippet in plan.snippets:
-        for source_path in snippet.sources:
+        sources = snippet.sources[1:] if snippet.kind == "am_program" else snippet.sources
+        for source_path in sources:
             if source_path in seen:
                 continue
             seen.add(source_path)
@@ -115,7 +126,7 @@ def build_artifacts(
 ) -> BuildArtifact:
     compile_flags = [
         "-O2",
-        "-march=rv64gcv",
+        "-march=rv64gcv_zicbop",
         "-mabi=lp64d",
         "-mcmodel=medany",
         "-ffreestanding",

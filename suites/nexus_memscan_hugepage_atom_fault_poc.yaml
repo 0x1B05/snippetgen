@@ -1,0 +1,9 @@
+suite: nexus_memscan_hugepage_atom_fault_poc
+target: xiangshan-verilator
+seed: 8200
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - nexus_memscan_hugepage_atom_fault_main
+    - finish_check

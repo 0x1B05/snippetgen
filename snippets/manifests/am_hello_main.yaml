@@ -1,0 +1,6 @@
+id: am_hello_main
+kind: am_program
+lang: c
+entry: main
+sources:
+  - snippets/programs/am_hello_main.c

@@ -15,6 +15,8 @@ This directory is split into three kinds of material:
 
 - [`2026-04-10-vsetvl-hang-investigation-notes.md`](2026-04-10-vsetvl-hang-investigation-notes.md)
   - `vsetvl` and interrupt investigation trail
+- [`2026-04-13-prefetchw-difftest-investigation-notes.md`](2026-04-13-prefetchw-difftest-investigation-notes.md)
+  - `prefetch.w`, `M_PFW`, delayed `tl_denied`, and NEMU difftest investigation trail
 
 ## Archived Plans And Drafts
 

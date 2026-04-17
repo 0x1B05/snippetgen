@@ -4,3 +4,5 @@ __pycache__/
 .humanize*
 build/*
 !build/.gitkeep
+*.vcd
+*.fst

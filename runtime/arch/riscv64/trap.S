@@ -4,14 +4,15 @@
 .type xsrt_trap_entry, @function
 
 #define XSRT_MCAUSE_MTIP 0x8000000000000007
-#define XSRT_TIMER_STATE_ENV_PTR 16
-#define XSRT_TIMER_STATE_PERIODIC 24
-#define XSRT_TIMER_STATE_SCRATCH_A1 32
-#define XSRT_TIMER_STATE_SCRATCH_A2 40
-#define XSRT_TIMER_STATE_SCRATCH_A3 48
 #define XSRT_TIMER_STATE_MTIMECMP_ADDR 0
-#define XSRT_TIMER_STATE_DELTA 8
-#define XSRT_RTC_ADDR 0x3800bff8
+#define XSRT_TIMER_STATE_MTIME_ADDR 8
+#define XSRT_TIMER_STATE_DELTA 16
+#define XSRT_TIMER_STATE_ENV_PTR 24
+#define XSRT_TIMER_STATE_PERIODIC 32
+#define XSRT_TIMER_STATE_CTE_ACTIVE 40
+#define XSRT_TIMER_STATE_SCRATCH_A1 48
+#define XSRT_TIMER_STATE_SCRATCH_A2 56
+#define XSRT_TIMER_STATE_SCRATCH_A3 64
 #define XSRT_ENV_FLAGS 32
 #define XSRT_ENV_INTERRUPT_COUNT 40
 #define XSRT_ENV_LAST_TRAP_CAUSE 48
@@ -52,7 +53,7 @@ xsrt_trap_entry:
 xsrt_trap_entry_timer_done:
   ld a1, XSRT_TIMER_STATE_PERIODIC(a0)
   beqz a1, xsrt_trap_entry_timer_disable
-  li a1, XSRT_RTC_ADDR
+  ld a1, XSRT_TIMER_STATE_MTIME_ADDR(a0)
   ld a2, 0(a1)
   ld a1, XSRT_TIMER_STATE_DELTA(a0)
   add a2, a2, a1
@@ -63,6 +64,9 @@ xsrt_trap_entry_timer_done:
 xsrt_trap_entry_timer_disable:
   li a3, XSRT_MIE_MTIE
   csrc mie, a3
+
+  ld a1, XSRT_TIMER_STATE_CTE_ACTIVE(a0)
+  bnez a1, xsrt_trap_entry_generic_restore
 
 xsrt_trap_entry_timer_restore:
   ld a3, XSRT_TIMER_STATE_SCRATCH_A3(a0)

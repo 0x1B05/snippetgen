@@ -19,6 +19,17 @@ enum {
   XSRT_FLAG_FAILED = 1u << 1,
 };
 
+#define XSRT_BAD_TRAP(code)                                                     \
+  do {                                                                          \
+    __asm__ volatile(                                                           \
+        "mv a0, %0\n\t"                                                         \
+        ".word 0x0005006b\n\t"                                                  \
+        :                                                                       \
+        : "r"((uint64_t) (code))                                                \
+        : "a0", "memory");                                                      \
+    __builtin_unreachable();                                                    \
+  } while (0)
+
 void xsrt_init(xsrt_env_t *env);
 void xsrt_finish_pass(xsrt_env_t *env);
 void xsrt_finish_fail(xsrt_env_t *env, uint64_t code);

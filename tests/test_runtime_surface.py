@@ -44,6 +44,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
         self.assertIn("uint64_t snippet_id;", env_h)
         self.assertIn("uint64_t seed;", env_h)
         self.assertIn("uint64_t flags;", env_h)
+        self.assertIn("#define XSRT_BAD_TRAP(code)", env_h)
         self.assertIn("void xsrt_init(xsrt_env_t *env);", env_h)
         self.assertIn("void xsrt_finish_pass(xsrt_env_t *env);", env_h)
         self.assertIn("void xsrt_finish_fail(xsrt_env_t *env, uint64_t code);", env_h)
@@ -70,6 +71,19 @@ class RuntimeSurfaceTest(unittest.TestCase):
         start_s = (ROOT / "runtime/arch/riscv64/start.S").read_text()
         self.assertIn("main", start_s)
         self.assertRegex(start_s, r"\b(call|tail)\s+main\b")
+
+    def test_sync_trap_install_initializes_mscratch(self) -> None:
+        trap_c = (ROOT / "runtime/src/xsrt_trap.c").read_text()
+
+        self.assertIn("static xsrt_trap_scratch_t g_sync_trap_scratch;", trap_c)
+        self.assertIn("void xsrt_reset_mscratch_for_sync_traps(void)", trap_c)
+        self.assertIn('csrw mscratch, %0', trap_c)
+        self.assertIn("xsrt_reset_mscratch_for_sync_traps();", trap_c)
+
+    def test_disabling_stimer_restores_sync_trap_scratch(self) -> None:
+        intr_c = (ROOT / "runtime/src/xsrt_intr.c").read_text()
+
+        self.assertIn("xsrt_reset_mscratch_for_sync_traps();", intr_c)
 
     def test_runtime_c_surfaces_cross_compile(self) -> None:
         smoke_c = textwrap.dedent(
@@ -161,7 +175,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
                 "-Wextra",
                 "-Werror",
                 "-O2",
-                "-march=rv64gcv",
+                "-march=rv64gcv_zicbop",
                 "-mabi=lp64d",
                 "-mcmodel=medany",
                 "-ffreestanding",

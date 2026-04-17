@@ -10,6 +10,7 @@ class SnippetSpec:
     kind: str
     lang: str
     sources: tuple[Path, ...]
+    entry: str | None = None
 
 
 @dataclass(frozen=True)

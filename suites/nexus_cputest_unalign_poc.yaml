@@ -1,0 +1,9 @@
+suite: nexus_cputest_unalign_poc
+target: xiangshan-verilator
+seed: 8193
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - nexus_cputest_unalign_main
+    - finish_check

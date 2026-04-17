@@ -106,6 +106,8 @@ make repro-split-store
   - periodic timer plus dense bundled `vsetvl zero, zero, zero` search workload
 - `suites/misaligned_split_store_search_poc.yaml`
   - misaligned split-store forwarding search workload for the `sqNeedDeq` bug class
+- `suites/prefetchw_tl_denied_fault_poc.yaml`
+  - one illegal-address `load` that must trap plus one illegal-address `prefetch.w` that must not trap
 
 ## Repro Commands
 
@@ -135,6 +137,22 @@ Expected result:
 
 - `status: "ran"`
 - `labels` include `good_trap`
+
+### Illegal-address `load` plus `prefetch.w`
+
+```bash
+export SNIPPETGEN_XS_ENV_SH=/path/to/xs-env/env.sh
+source "$SNIPPETGEN_XS_ENV_SH"
+python3 generator/cli.py run suites/prefetchw_tl_denied_fault_poc.yaml --seed 4660
+```
+
+Expected result:
+
+- `status: "ran"`
+- the suite reaches `finish_check`
+- the snippet performs exactly one `ld` and one `prefetch.w` on the same low-address target
+- the normal `ld` is expected to take a load access fault
+- `prefetch.w` is expected not to raise a software-visible trap
 
 ### Misaligned split-store abort on pre-fix XiangShan
 

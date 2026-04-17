@@ -1,0 +1,5 @@
+id: check_prefetchw_tl_denied_fault
+kind: proc
+lang: c
+sources:
+  - snippets/cbo/check_prefetchw_tl_denied_fault.c

@@ -1,0 +1,9 @@
+suite: nexus_cputest_load_store_poc
+target: xiangshan-verilator
+seed: 8194
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - nexus_cputest_load_store_main
+    - finish_check

@@ -1,0 +1,10 @@
+suite: prefetchw_tl_denied_fault_poc
+target: xiangshan-verilator
+seed: 4660
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - prefetchw_tl_denied_fault
+    - check_prefetchw_tl_denied_fault
+    - finish_check

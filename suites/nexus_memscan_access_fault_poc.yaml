@@ -1,0 +1,9 @@
+suite: nexus_memscan_access_fault_poc
+target: xiangshan-verilator
+seed: 8195
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - nexus_memscan_access_fault_main
+    - finish_check

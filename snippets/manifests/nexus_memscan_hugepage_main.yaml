@@ -1,0 +1,6 @@
+id: nexus_memscan_hugepage_main
+kind: am_program
+lang: c
+entry: main
+sources:
+  - snippets/programs/nexus_memscan_hugepage_main.c

@@ -417,7 +417,7 @@ class RunPipelineTest(unittest.TestCase):
         self.assertNotIn("--no-diff", command)
         self.assertIn("--enable-fork", command)
         self.assertIn("-X", command)
-        self.assertIn("1", command)
+        self.assertEqual("10", command[command.index("-X") + 1])
         self.assertIn("--wave-path", command)
         self.assertIn(str(build_dir / "lightsss-wave"), command)
         self.assertNotIn("--dump-wave", command)
