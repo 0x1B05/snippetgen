@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 class BuildPipelineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.build_dir = ROOT / "build" / "scalar_load_legality_poc"
+        self.deferred_check_markers_build_dir = ROOT / "build" / "deferred_check_markers_poc"
         self.vsetvl_build_dir = ROOT / "build" / "vsetvl_interrupt_path_poc"
         self.vsetvl_search_build_dir = ROOT / "build" / "vsetvl_interrupt_search_poc"
         self.interrupt_build_dir = ROOT / "build" / "interrupt_response_poc"
@@ -48,6 +49,8 @@ class BuildPipelineTest(unittest.TestCase):
         self.nexus_memscan_page_fault_build_dir = ROOT / "build" / "nexus_memscan_page_fault_poc"
         if self.build_dir.exists():
             shutil.rmtree(self.build_dir)
+        if self.deferred_check_markers_build_dir.exists():
+            shutil.rmtree(self.deferred_check_markers_build_dir)
         if self.vsetvl_build_dir.exists():
             shutil.rmtree(self.vsetvl_build_dir)
         if self.vsetvl_search_build_dir.exists():
@@ -130,6 +133,87 @@ class BuildPipelineTest(unittest.TestCase):
             self.assertGreater(current_index, last_index)
             last_index = current_index
         self.assertIn("env.seed = 0x1234ull;", harness)
+
+    def test_emitter_generates_two_phase_harness_for_deferred_check_suite(self) -> None:
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+        toolchain = importlib.import_module("generator.xsgen.toolchain")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_suite = Path(tmpdir) / "deferred_check_markers_poc.yaml"
+            tmp_suite.write_text(
+                textwrap.dedent(
+                    """
+                    suite: deferred_check_markers_poc
+                    target: xiangshan-verilator
+                    seed: 99
+                    compose:
+                      mode: sequence
+                      run_snippets:
+                        - init_basic_env
+                        - arm_timer
+                        - finish_check
+                      check_snippets:
+                        - arm_timer
+                        - finish_check
+                    """
+                ).strip()
+            )
+            suite = suite_loader.load_suite(tmp_suite)
+            plan = suite_loader.build_compose_plan(suite, snippet_db.load_snippet_db(ROOT))
+            artifact = toolchain.artifact_paths_for_suite(Path(tmpdir), suite.name)
+            emitter.emit_harness(plan, artifact.generated_suite_path)
+            harness = artifact.generated_suite_path.read_text()
+
+        self.assertIn("xsrt_run_snippet_no_check(&env, &snippet_init_basic_env);", harness)
+        self.assertIn("xsrt_run_snippet_no_check(&env, &snippet_arm_timer);", harness)
+        self.assertIn("xsrt_run_snippet_no_check(&env, &snippet_finish_check);", harness)
+        self.assertIn("xsrt_run_snippet_check_only(&env, &snippet_arm_timer);", harness)
+        self.assertIn("xsrt_run_snippet_check_only(&env, &snippet_finish_check);", harness)
+        self.assertNotIn("xsrt_run_snippet(&env,", harness)
+        self.assertEqual(1, harness.count("extern const xsrt_snippet_desc_t snippet_arm_timer;"))
+        self.assertEqual(1, harness.count("extern const xsrt_snippet_desc_t snippet_finish_check;"))
+
+        run_init = harness.index("xsrt_run_snippet_no_check(&env, &snippet_init_basic_env);")
+        run_arm_timer = harness.index("xsrt_run_snippet_no_check(&env, &snippet_arm_timer);")
+        run_finish = harness.index("xsrt_run_snippet_no_check(&env, &snippet_finish_check);")
+        check_arm_timer = harness.index("xsrt_run_snippet_check_only(&env, &snippet_arm_timer);")
+        check_finish = harness.index("xsrt_run_snippet_check_only(&env, &snippet_finish_check);")
+
+        self.assertLess(run_init, run_arm_timer)
+        self.assertLess(run_arm_timer, run_finish)
+        self.assertLess(run_finish, check_arm_timer)
+        self.assertLess(check_arm_timer, check_finish)
+
+    def test_emitter_rejects_partial_phase_plan(self) -> None:
+        emitter = importlib.import_module("generator.xsgen.emitter")
+        model = importlib.import_module("generator.xsgen.model")
+
+        plan = model.ComposePlan(
+            suite_name="partial_phase_plan",
+            target="xiangshan-verilator",
+            seed=1,
+            snippet_ids=("arm_timer",),
+            snippets=(
+                model.SnippetSpec(
+                    id="arm_timer",
+                    kind="proc",
+                    lang="c",
+                    sources=(),
+                ),
+            ),
+            run_snippet_ids=("arm_timer",),
+            check_snippet_ids=None,
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "generated_suite.c"
+            with self.assertRaisesRegex(
+                ValueError,
+                "run_snippet_ids and check_snippet_ids must both be set or both be None",
+            ):
+                emitter.emit_harness(plan, output_path)
 
     def test_suite_reorder_changes_generated_harness_order(self) -> None:
         emitter = importlib.import_module("generator.xsgen.emitter")
@@ -234,6 +318,45 @@ class BuildPipelineTest(unittest.TestCase):
         self.assertTrue(manifest["commands"]["compile"])
         self.assertTrue(manifest["commands"]["link"])
         self.assertTrue(manifest["commands"]["objcopy"])
+
+    def test_deferred_check_suite_build_generates_artifacts_and_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_suite = Path(tmpdir) / "deferred_check_markers_poc.yaml"
+            tmp_suite.write_text(
+                textwrap.dedent(
+                    """
+                    suite: deferred_check_markers_poc
+                    target: xiangshan-verilator
+                    seed: 99
+                    compose:
+                      mode: sequence
+                      run_snippets:
+                        - init_basic_env
+                        - arm_timer
+                        - finish_check
+                      check_snippets:
+                        - arm_timer
+                        - finish_check
+                    """
+                ).strip()
+            )
+            self.assert_proc_check_suite_build(
+                suite_path=str(tmp_suite.resolve()),
+                build_dir=self.deferred_check_markers_build_dir,
+                suite_name="deferred_check_markers_poc",
+                snippet_ids=[
+                    "init_basic_env",
+                    "arm_timer",
+                    "finish_check",
+                ],
+            )
+
+            generated_text = (self.deferred_check_markers_build_dir / "generated_suite.c").read_text()
+            self.assertIn("xsrt_run_snippet_no_check(&env, &snippet_arm_timer);", generated_text)
+            self.assertIn("xsrt_run_snippet_check_only(&env, &snippet_arm_timer);", generated_text)
+            self.assertIn("xsrt_run_snippet_check_only(&env, &snippet_finish_check);", generated_text)
+            self.assertNotIn("xsrt_run_snippet(&env,", generated_text)
+            self.assertEqual(1, generated_text.count("extern const xsrt_snippet_desc_t snippet_arm_timer;"))
 
     def test_vsetvl_suite_build_generates_artifacts_and_manifest(self) -> None:
         result = subprocess.run(

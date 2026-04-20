@@ -16,6 +16,13 @@ def format_seed_literal(seed: int) -> str:
 
 def emit_harness(plan: ComposePlan, output_path: Path) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    has_run_phase = plan.run_snippet_ids is not None
+    has_check_phase = plan.check_snippet_ids is not None
+
+    if has_run_phase != has_check_phase:
+        raise ValueError(
+            "run_snippet_ids and check_snippet_ids must both be set or both be None"
+        )
 
     lines = [
         '#include "xsrt_env.h"',
@@ -50,18 +57,25 @@ def emit_harness(plan: ComposePlan, output_path: Path) -> Path:
         ]
     )
 
-    for snippet_id in plan.snippet_ids:
-        symbol = descriptor_symbol(snippet_id)
-        lines.extend(
-            [
-                f"  rc = xsrt_run_snippet(&env, &{symbol});",
-                "  if (rc != 0) {",
-                "    xsrt_finish_fail(&env, (unsigned long) rc);",
-                "    return rc;",
-                "  }",
-                "",
-            ]
-        )
+    def emit_phase(snippet_ids: tuple[str, ...], runner: str) -> None:
+        for snippet_id in snippet_ids:
+            symbol = descriptor_symbol(snippet_id)
+            lines.extend(
+                [
+                    f"  rc = {runner}(&env, &{symbol});",
+                    "  if (rc != 0) {",
+                    "    xsrt_finish_fail(&env, (unsigned long) rc);",
+                    "    return rc;",
+                    "  }",
+                    "",
+                ]
+            )
+
+    if has_run_phase and has_check_phase:
+        emit_phase(plan.run_snippet_ids, "xsrt_run_snippet_no_check")
+        emit_phase(plan.check_snippet_ids, "xsrt_run_snippet_check_only")
+    else:
+        emit_phase(plan.snippet_ids, "xsrt_run_snippet")
 
     lines.extend(
         [
