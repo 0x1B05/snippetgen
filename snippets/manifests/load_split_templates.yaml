@@ -1,0 +1,5 @@
+id: load_split_templates
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_misalign/load_split_templates.c

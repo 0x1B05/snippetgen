@@ -9,6 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AMProgramSnippetBuildTest(unittest.TestCase):
+    def assert_program_contains(self, relative_path: str, needles: tuple[str, ...]) -> None:
+        sample = (ROOT / relative_path).read_text()
+        for needle in needles:
+            self.assertIn(needle, sample)
+
     def test_am_program_sample_uses_ioe_timer_and_serial_paths(self) -> None:
         sample = (ROOT / "snippets" / "programs" / "am_hello_main.c").read_text()
 
@@ -26,6 +31,63 @@ class AMProgramSnippetBuildTest(unittest.TestCase):
         self.assertIn("xsrt_timer_read_uptime()", sample)
         self.assertIn("xsrt_timer_read_compare()", sample)
         self.assertIn("if (last_time < last_compare)", sample)
+
+    def test_scalar_misalign_load_in_16b_program_uses_unaligned_lw_and_ld_within_16b(self) -> None:
+        self.assert_program_contains(
+            "snippets/programs/scalar_misalign_load_in_16b_main.c",
+            (
+                "__attribute__((aligned(16)))",
+                '"lw %0, 0(%1)"',
+                '"ld %0, 0(%1)"',
+                "const uint8_t *lw_ptr = base + 1u;",
+                "const uint8_t *ld_ptr = base + 7u;",
+            ),
+        )
+
+    def test_scalar_misalign_load_cross_16b_program_uses_cross_boundary_ld(self) -> None:
+        self.assert_program_contains(
+            "snippets/programs/scalar_misalign_load_cross_16b_main.c",
+            (
+                "__attribute__((aligned(16)))",
+                '"ld %0, 0(%1)"',
+                "const uint8_t *ptr = base + 13u;",
+                "return 11;",
+            ),
+        )
+
+    def test_scalar_misalign_store_in_16b_program_uses_unaligned_sw_and_sd_within_16b(self) -> None:
+        self.assert_program_contains(
+            "snippets/programs/scalar_misalign_store_in_16b_main.c",
+            (
+                '"sw %1, 0(%0)"',
+                '"sd %1, 0(%0)"',
+                "uint8_t *sw_ptr = base + 1u;",
+                "uint8_t *sd_ptr = base + 7u;",
+            ),
+        )
+
+    def test_scalar_misalign_store_cross_16b_program_uses_cross_boundary_sw_and_sd(self) -> None:
+        self.assert_program_contains(
+            "snippets/programs/scalar_misalign_store_cross_16b_main.c",
+            (
+                "__attribute__((aligned(16)))",
+                '"sw %1, 0(%0)"',
+                '"sd %1, 0(%0)"',
+                "uint8_t *sd_ptr = region_a + 15u;",
+                "uint8_t *sw_ptr = region_b + 14u;",
+            ),
+        )
+
+    def test_scalar_misalign_store_load_overlap_program_reads_back_complete_value(self) -> None:
+        self.assert_program_contains(
+            "snippets/programs/scalar_misalign_store_load_overlap_main.c",
+            (
+                '"sd %1, 0(%0)"',
+                '"ld %0, 0(%1)"',
+                "uint8_t *store_ptr = base + 15u;",
+                "const uint8_t *fragment_ptr = base + 16u;",
+            ),
+        )
 
     def test_nexus_memscan_program_uses_pmp_and_mprv_for_fault_probe(self) -> None:
         sample = (ROOT / "snippets" / "programs" / "nexus_memscan_access_fault_main.c").read_text()

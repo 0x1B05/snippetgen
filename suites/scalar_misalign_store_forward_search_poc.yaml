@@ -1,0 +1,10 @@
+suite: scalar_misalign_store_forward_search_poc
+target: xiangshan-verilator
+seed: 8501
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - store_forward_search
+    - check_store_forward_search
+    - finish_check

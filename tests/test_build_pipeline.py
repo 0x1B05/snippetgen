@@ -26,6 +26,18 @@ class BuildPipelineTest(unittest.TestCase):
         self.prefetchw_build_dir = ROOT / "build" / "prefetchw_tl_denied_fault_poc"
         self.am_program_build_dir = ROOT / "build" / "am_hello_main_poc"
         self.am_timer_program_build_dir = ROOT / "build" / "am_timer_event_poc"
+        self.scalar_misalign_load_in_16b_build_dir = ROOT / "build" / "scalar_misalign_load_in_16b_poc"
+        self.scalar_misalign_load_cross_16b_build_dir = ROOT / "build" / "scalar_misalign_load_cross_16b_poc"
+        self.scalar_misalign_store_in_16b_build_dir = ROOT / "build" / "scalar_misalign_store_in_16b_poc"
+        self.scalar_misalign_store_cross_16b_build_dir = ROOT / "build" / "scalar_misalign_store_cross_16b_poc"
+        self.scalar_misalign_store_load_overlap_build_dir = ROOT / "build" / "scalar_misalign_store_load_overlap_poc"
+        self.scalar_misalign_load_split_build_dir = ROOT / "build" / "scalar_misalign_load_split_templates_poc"
+        self.scalar_misalign_store_split_build_dir = ROOT / "build" / "scalar_misalign_store_split_templates_poc"
+        self.scalar_misalign_cross_page_build_dir = ROOT / "build" / "scalar_misalign_cross_page_faults_poc"
+        self.scalar_misalign_store_forward_overlap_build_dir = ROOT / "build" / "scalar_misalign_store_forward_overlap_poc"
+        self.scalar_misalign_store_forward_search_build_dir = ROOT / "build" / "scalar_misalign_store_forward_search_poc"
+        self.scalar_misalign_cross_page_search_build_dir = ROOT / "build" / "scalar_misalign_cross_page_fault_search_poc"
+        self.scalar_misalign_replay_probe_build_dir = ROOT / "build" / "scalar_misalign_replay_probe_poc"
         self.nexus_cputest_unalign_build_dir = ROOT / "build" / "nexus_cputest_unalign_poc"
         self.nexus_cputest_load_store_build_dir = ROOT / "build" / "nexus_cputest_load_store_poc"
         self.nexus_memscan_access_fault_build_dir = ROOT / "build" / "nexus_memscan_access_fault_poc"
@@ -52,6 +64,30 @@ class BuildPipelineTest(unittest.TestCase):
             shutil.rmtree(self.am_program_build_dir)
         if self.am_timer_program_build_dir.exists():
             shutil.rmtree(self.am_timer_program_build_dir)
+        if self.scalar_misalign_load_in_16b_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_load_in_16b_build_dir)
+        if self.scalar_misalign_load_cross_16b_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_load_cross_16b_build_dir)
+        if self.scalar_misalign_store_in_16b_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_store_in_16b_build_dir)
+        if self.scalar_misalign_store_cross_16b_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_store_cross_16b_build_dir)
+        if self.scalar_misalign_store_load_overlap_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_store_load_overlap_build_dir)
+        if self.scalar_misalign_load_split_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_load_split_build_dir)
+        if self.scalar_misalign_store_split_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_store_split_build_dir)
+        if self.scalar_misalign_cross_page_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_cross_page_build_dir)
+        if self.scalar_misalign_store_forward_overlap_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_store_forward_overlap_build_dir)
+        if self.scalar_misalign_store_forward_search_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_store_forward_search_build_dir)
+        if self.scalar_misalign_cross_page_search_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_cross_page_search_build_dir)
+        if self.scalar_misalign_replay_probe_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_replay_probe_build_dir)
         if self.nexus_cputest_unalign_build_dir.exists():
             shutil.rmtree(self.nexus_cputest_unalign_build_dir)
         if self.nexus_cputest_load_store_build_dir.exists():
@@ -476,6 +512,199 @@ class BuildPipelineTest(unittest.TestCase):
             manifest["snippet_ids"],
         )
         self.assertIn("xsam_program_entry_nexus_cputest_unalign_main", generated_suite.read_text())
+
+    def assert_am_program_suite_build(
+        self,
+        *,
+        suite_path: str,
+        build_dir: Path,
+        suite_name: str,
+        snippet_id: str,
+    ) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", suite_path],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        generated_suite = build_dir / "generated_suite.c"
+        build_manifest = build_dir / "build_manifest.json"
+
+        self.assertTrue(generated_suite.is_file())
+        self.assertTrue(build_manifest.is_file())
+
+        manifest = json.loads(build_manifest.read_text())
+        self.assertEqual(suite_name, manifest["suite"])
+        self.assertEqual(
+            ["init_basic_env", snippet_id, "finish_check"],
+            manifest["snippet_ids"],
+        )
+        self.assertIn(f"xsam_program_entry_{snippet_id}", generated_suite.read_text())
+
+    def test_scalar_misalign_load_in_16b_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_am_program_suite_build(
+            suite_path="suites/scalar_misalign_load_in_16b_poc.yaml",
+            build_dir=self.scalar_misalign_load_in_16b_build_dir,
+            suite_name="scalar_misalign_load_in_16b_poc",
+            snippet_id="scalar_misalign_load_in_16b_main",
+        )
+
+    def test_scalar_misalign_load_cross_16b_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_am_program_suite_build(
+            suite_path="suites/scalar_misalign_load_cross_16b_poc.yaml",
+            build_dir=self.scalar_misalign_load_cross_16b_build_dir,
+            suite_name="scalar_misalign_load_cross_16b_poc",
+            snippet_id="scalar_misalign_load_cross_16b_main",
+        )
+
+    def test_scalar_misalign_store_in_16b_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_am_program_suite_build(
+            suite_path="suites/scalar_misalign_store_in_16b_poc.yaml",
+            build_dir=self.scalar_misalign_store_in_16b_build_dir,
+            suite_name="scalar_misalign_store_in_16b_poc",
+            snippet_id="scalar_misalign_store_in_16b_main",
+        )
+
+    def test_scalar_misalign_store_cross_16b_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_am_program_suite_build(
+            suite_path="suites/scalar_misalign_store_cross_16b_poc.yaml",
+            build_dir=self.scalar_misalign_store_cross_16b_build_dir,
+            suite_name="scalar_misalign_store_cross_16b_poc",
+            snippet_id="scalar_misalign_store_cross_16b_main",
+        )
+
+    def test_scalar_misalign_store_load_overlap_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_am_program_suite_build(
+            suite_path="suites/scalar_misalign_store_load_overlap_poc.yaml",
+            build_dir=self.scalar_misalign_store_load_overlap_build_dir,
+            suite_name="scalar_misalign_store_load_overlap_poc",
+            snippet_id="scalar_misalign_store_load_overlap_main",
+        )
+
+    def assert_proc_check_suite_build(
+        self,
+        *,
+        suite_path: str,
+        build_dir: Path,
+        suite_name: str,
+        snippet_ids: list[str],
+    ) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "build", suite_path],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+
+        generated_suite = build_dir / "generated_suite.c"
+        build_manifest = build_dir / "build_manifest.json"
+
+        self.assertTrue(generated_suite.is_file())
+        self.assertTrue(build_manifest.is_file())
+
+        manifest = json.loads(build_manifest.read_text())
+        self.assertEqual(suite_name, manifest["suite"])
+        self.assertEqual(snippet_ids, manifest["snippet_ids"])
+
+        generated_text = generated_suite.read_text()
+        for snippet_id in snippet_ids:
+            self.assertIn(f"snippet_{snippet_id}", generated_text)
+
+    def test_scalar_misalign_load_split_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_load_split_templates_poc.yaml",
+            build_dir=self.scalar_misalign_load_split_build_dir,
+            suite_name="scalar_misalign_load_split_templates_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "load_split_templates",
+                "check_load_split_templates",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_store_split_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_store_split_templates_poc.yaml",
+            build_dir=self.scalar_misalign_store_split_build_dir,
+            suite_name="scalar_misalign_store_split_templates_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "store_split_templates",
+                "check_store_split_templates",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_cross_page_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_cross_page_faults_poc.yaml",
+            build_dir=self.scalar_misalign_cross_page_build_dir,
+            suite_name="scalar_misalign_cross_page_faults_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "cross_page_faults",
+                "check_cross_page_faults",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_store_forward_overlap_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_store_forward_overlap_poc.yaml",
+            build_dir=self.scalar_misalign_store_forward_overlap_build_dir,
+            suite_name="scalar_misalign_store_forward_overlap_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "store_forward_overlap",
+                "check_store_forward_overlap",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_store_forward_search_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_store_forward_search_poc.yaml",
+            build_dir=self.scalar_misalign_store_forward_search_build_dir,
+            suite_name="scalar_misalign_store_forward_search_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "store_forward_search",
+                "check_store_forward_search",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_cross_page_fault_search_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_cross_page_fault_search_poc.yaml",
+            build_dir=self.scalar_misalign_cross_page_search_build_dir,
+            suite_name="scalar_misalign_cross_page_fault_search_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "cross_page_fault_search",
+                "check_cross_page_fault_search",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_replay_probe_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_replay_probe_poc.yaml",
+            build_dir=self.scalar_misalign_replay_probe_build_dir,
+            suite_name="scalar_misalign_replay_probe_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "replay_probe",
+                "check_replay_probe",
+                "finish_check",
+            ],
+        )
 
     def test_nexus_cputest_load_store_suite_build_generates_artifacts_and_manifest(self) -> None:
         result = subprocess.run(

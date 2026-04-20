@@ -1,0 +1,10 @@
+suite: scalar_misalign_replay_probe_poc
+target: xiangshan-verilator
+seed: 8503
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - replay_probe
+    - check_replay_probe
+    - finish_check

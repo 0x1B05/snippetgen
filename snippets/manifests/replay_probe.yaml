@@ -1,0 +1,5 @@
+id: replay_probe
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_misalign/replay_probe.c

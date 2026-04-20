@@ -1,0 +1,9 @@
+suite: scalar_misalign_store_load_overlap_poc
+target: xiangshan-verilator
+seed: 8305
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - scalar_misalign_store_load_overlap_main
+    - finish_check

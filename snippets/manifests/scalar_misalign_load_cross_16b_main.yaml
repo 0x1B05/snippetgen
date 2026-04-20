@@ -1,0 +1,6 @@
+id: scalar_misalign_load_cross_16b_main
+kind: am_program
+lang: c
+entry: main
+sources:
+  - snippets/programs/scalar_misalign_load_cross_16b_main.c

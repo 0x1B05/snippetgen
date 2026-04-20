@@ -1,0 +1,5 @@
+id: store_forward_search
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_misalign/store_forward_search.c

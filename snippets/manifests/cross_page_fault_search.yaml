@@ -1,0 +1,5 @@
+id: cross_page_fault_search
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_misalign/cross_page_fault_search.c

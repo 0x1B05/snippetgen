@@ -1,0 +1,9 @@
+suite: scalar_misalign_store_cross_16b_poc
+target: xiangshan-verilator
+seed: 8304
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - scalar_misalign_store_cross_16b_main
+    - finish_check

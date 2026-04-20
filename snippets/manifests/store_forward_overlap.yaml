@@ -1,0 +1,5 @@
+id: store_forward_overlap
+kind: proc
+lang: c
+sources:
+  - snippets/scalar_misalign/store_forward_overlap.c

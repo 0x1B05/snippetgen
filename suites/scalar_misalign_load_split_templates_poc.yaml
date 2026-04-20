@@ -1,0 +1,10 @@
+suite: scalar_misalign_load_split_templates_poc
+target: xiangshan-verilator
+seed: 8401
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - load_split_templates
+    - check_load_split_templates
+    - finish_check

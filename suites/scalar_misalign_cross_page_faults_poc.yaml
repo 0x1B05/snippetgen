@@ -1,0 +1,10 @@
+suite: scalar_misalign_cross_page_faults_poc
+target: xiangshan-verilator
+seed: 8403
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - cross_page_faults
+    - check_cross_page_faults
+    - finish_check
