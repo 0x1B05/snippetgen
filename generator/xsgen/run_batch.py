@@ -110,6 +110,7 @@ def _entry_payload(entry: RunEntry) -> dict:
         "labels": list(entry.labels),
         "notes": entry.notes,
         "returncode": entry.returncode,
+        "finish_code": entry.finish_code,
     }
 
 
@@ -139,6 +140,7 @@ def _completed_entry(
         labels=target_result.labels,
         notes=target_result.notes,
         returncode=target_result.returncode,
+        finish_code=target_result.finish_code,
     )
 
 

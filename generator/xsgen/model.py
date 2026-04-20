@@ -61,6 +61,7 @@ class TargetRunResult:
     labels: tuple[str, ...]
     notes: str
     returncode: int | None = None
+    finish_code: int | None = None
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,7 @@ class RunEntry:
     labels: tuple[str, ...]
     notes: str
     returncode: int | None = None
+    finish_code: int | None = None
 
 
 @dataclass(frozen=True)

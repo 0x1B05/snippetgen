@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "xsam/program_snippet.h"
+#include "xsam_xs_platform.h"
 #include "xsrt_trap.h"
 
 /*
@@ -75,11 +76,7 @@ static uint64_t nexus_memscan_make_leaf_pte(uintptr_t pa, uint64_t flags) {
 }
 
 static void nexus_memscan_enable_supervisor_access_window(void) {
-  const uintptr_t allow_all_s_mode = (uintptr_t) 31u << (8u * 7u);
-
-  __asm__ volatile("csrw pmpaddr15, %0" : : "r"(~(uintptr_t) 0) : "memory");
-  __asm__ volatile("csrw pmpcfg2, %0" : : "r"(allow_all_s_mode) : "memory");
-  __asm__ volatile("sfence.vma x0, x0" : : : "memory");
+  xsam_xs_pmp_init();
 }
 
 static void nexus_memscan_map_leaf(

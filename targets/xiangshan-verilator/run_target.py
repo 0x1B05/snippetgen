@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import os
+import re
 import shutil
 import subprocess
 
@@ -12,6 +13,7 @@ DEFAULT_MAX_CYCLES = 20000
 DEFAULT_MAX_INSTR = 20000
 DEFAULT_TIMEOUT_SEC = 120
 DEFAULT_FORK_INTERVAL_SEC = 10
+UNKNOWN_TRAP_CODE_RE = re.compile(r"Unknown trap code:\s*(\d+)")
 
 
 def _xs_env() -> dict[str, str]:
@@ -83,6 +85,7 @@ def _error_result(*, artifacts, notes: str, labels: tuple[str, ...] = ("error",)
 
 def _classify_result(*, stdout_text: str, stderr_text: str, returncode: int) -> TargetRunResult:
     merged = f"{stdout_text}\n{stderr_text}"
+    unknown_trap_match = UNKNOWN_TRAP_CODE_RE.search(merged)
 
     if "HIT GOOD TRAP" in merged:
         return TargetRunResult(
@@ -90,6 +93,7 @@ def _classify_result(*, stdout_text: str, stderr_text: str, returncode: int) -> 
             labels=("built", "ran", "good_trap"),
             notes="HIT GOOD TRAP",
             returncode=returncode,
+            finish_code=0,
         )
 
     if "HIT BAD TRAP" in merged:
@@ -98,6 +102,17 @@ def _classify_result(*, stdout_text: str, stderr_text: str, returncode: int) -> 
             labels=("built", "ran", "bad_trap"),
             notes="HIT BAD TRAP",
             returncode=returncode,
+            finish_code=1,
+        )
+
+    if unknown_trap_match is not None:
+        finish_code = int(unknown_trap_match.group(1))
+        return TargetRunResult(
+            status="bad_trap",
+            labels=("built", "ran", "bad_trap"),
+            notes=f"Unknown trap code: {finish_code}",
+            returncode=returncode,
+            finish_code=finish_code,
         )
 
     if "ABORT at pc" in merged or "Assertion failed" in merged:

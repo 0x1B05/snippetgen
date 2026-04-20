@@ -9,6 +9,7 @@ typedef struct {
   uint64_t snippet_id;
   uint64_t seed;
   uint64_t flags;
+  uint64_t finish_code;
   uint64_t interrupt_count;
   uint64_t last_trap_cause;
   uint64_t last_trap_epc;

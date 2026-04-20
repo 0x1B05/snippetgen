@@ -44,6 +44,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
         self.assertIn("uint64_t snippet_id;", env_h)
         self.assertIn("uint64_t seed;", env_h)
         self.assertIn("uint64_t flags;", env_h)
+        self.assertIn("uint64_t finish_code;", env_h)
         self.assertIn("#define XSRT_BAD_TRAP(code)", env_h)
         self.assertIn("void xsrt_init(xsrt_env_t *env);", env_h)
         self.assertIn("void xsrt_finish_pass(xsrt_env_t *env);", env_h)
@@ -155,7 +156,20 @@ class RuntimeSurfaceTest(unittest.TestCase):
                 return 24;
               }
 
+              if (env.finish_code != 0u) {
+                return 25;
+              }
+
               xsrt_finish_pass(&env);
+              if (env.finish_code != 0u) {
+                return 26;
+              }
+
+              xsrt_finish_fail(&env, 77u);
+              if (env.finish_code != 77u) {
+                return 27;
+              }
+
               return 0;
             }
             """

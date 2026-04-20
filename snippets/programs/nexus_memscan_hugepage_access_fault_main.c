@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "xsam/program_snippet.h"
+#include "xsam_xs_platform.h"
 #include "xsrt_trap.h"
 
 /*
@@ -65,15 +66,8 @@ static uint64_t nexus_memscan_make_leaf_pte(uintptr_t pa, uint64_t flags) {
 }
 
 static void nexus_memscan_configure_pmp_windows(void) {
-  const uintptr_t allow_all_s_mode = (uintptr_t) 31u << (8u * 7u);
-  const uintptr_t deny_addr = (nexus_memscan_fault_pa | ((0x10000ull >> 1) - 1ull)) >> 2;
-  const uintptr_t deny_napot = (uintptr_t) 3u << 3;
-
-  __asm__ volatile("csrw pmpaddr15, %0" : : "r"(~(uintptr_t) 0) : "memory");
-  __asm__ volatile("csrw pmpcfg2, %0" : : "r"(allow_all_s_mode) : "memory");
-  __asm__ volatile("csrw pmpaddr1, %0" : : "r"(deny_addr) : "memory");
-  __asm__ volatile("csrw pmpcfg0, %0" : : "r"(deny_napot << 8) : "memory");
-  __asm__ volatile("sfence.vma x0, x0" : : : "memory");
+  xsam_xs_pmp_init();
+  xsam_xs_pmp_enable_napot(1u, nexus_memscan_fault_pa, 0x10000ull, 0u, 0u);
 }
 
 static void nexus_memscan_map_huge_leaf(

@@ -29,6 +29,7 @@ void xsrt_finish_pass(xsrt_env_t *env) {
 
   env->flags |= XSRT_FLAG_FINISHED;
   env->flags &= ~((uint64_t) XSRT_FLAG_FAILED);
+  env->finish_code = 0u;
   xsrt_platform_finish(env, 0);
 }
 
@@ -38,6 +39,7 @@ void xsrt_finish_fail(xsrt_env_t *env, uint64_t code) {
   }
 
   env->flags |= XSRT_FLAG_FINISHED | XSRT_FLAG_FAILED;
+  env->finish_code = code;
   xsrt_platform_finish(env, code);
 }
 

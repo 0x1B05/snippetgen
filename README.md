@@ -44,6 +44,13 @@ Run artifacts are written to:
 - `build/<suite>/runs/<batch_id>/seed_<N>/stderr.log`
 - `build/<suite>/runs/<batch_id>/seed_<N>/run_meta.json`
 
+Each run entry in `run_meta.json` and `batch_meta.json` now includes `finish_code`:
+
+- `0`: XiangShan reported `HIT GOOD TRAP`
+- `1`: XiangShan reported `HIT BAD TRAP`
+- `N > 1`: XiangShan reported `Unknown trap code: N`
+- `null`: the runner did not recover a guest semantic trap code
+
 If you need a stable, reusable path for a repro case, pass `--batch-id`:
 
 ```bash

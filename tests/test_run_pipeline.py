@@ -560,6 +560,146 @@ class RunPipelineTest(unittest.TestCase):
         self.assertEqual("bad_trap", result.status)
         self.assertIn("bad_trap", result.labels)
 
+    def test_xiangshan_runner_sets_finish_code_one_for_bad_trap(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_bad_trap_code_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        model = importlib.import_module("generator.xsgen.model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            xs_env_root = root / "xs-env"
+            env_sh = xs_env_root / "env.sh"
+            emu_path = xs_env_root / "XiangShan" / "build" / "verilator-compile" / "emu"
+            diff_path = xs_env_root / "NEMU" / "build" / "riscv64-nemu-interpreter-so"
+            build_dir = root / "build"
+            bin_path = build_dir / "test.bin"
+            elf_path = build_dir / "test.elf"
+            stdout_log_path = build_dir / "stdout.log"
+            stderr_log_path = build_dir / "stderr.log"
+            run_meta_path = build_dir / "run_meta.json"
+
+            emu_path.parent.mkdir(parents=True, exist_ok=True)
+            diff_path.parent.mkdir(parents=True, exist_ok=True)
+            build_dir.mkdir(parents=True, exist_ok=True)
+
+            env_sh.write_text("#!/bin/sh\n")
+            emu_path.write_text("#!/bin/sh\nexit 1\n")
+            emu_path.chmod(0o755)
+            diff_path.write_text("stub diff\n")
+            bin_path.write_bytes(b"\x00")
+            elf_path.write_bytes(b"\x00")
+            stdout_log_path.write_text("")
+            stderr_log_path.write_text("")
+
+            artifacts = model.RunSeedArtifacts(
+                suite_name="demo",
+                target="xiangshan-verilator",
+                seed=4660,
+                run_batch="batch",
+                build_artifact=model.BuildArtifact(
+                    suite_name="demo",
+                    build_dir=build_dir,
+                    generated_suite_path=build_dir / "generated_suite.c",
+                    elf_path=elf_path,
+                    bin_path=bin_path,
+                    build_manifest_path=build_dir / "build_manifest.json",
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+            )
+
+            def fake_run(command, **kwargs):
+                kwargs["stdout"].write("Core 0: HIT BAD TRAP at pc = 0x8000002c\n")
+                kwargs["stdout"].flush()
+                return subprocess.CompletedProcess(command, 1)
+
+            with mock.patch.dict(
+                module.os.environ,
+                {"SNIPPETGEN_XS_ENV_SH": str(env_sh)},
+                clear=False,
+            ):
+                with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                    result = module.run_target(artifacts=artifacts, timeout_s=5)
+
+        self.assertEqual("bad_trap", result.status)
+        self.assertEqual(1, result.finish_code)
+
+    def test_xiangshan_runner_classifies_unknown_trap_code_from_logs(self) -> None:
+        module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
+        spec = importlib.util.spec_from_file_location("xiangshan_run_target_unknown_trap_test", module_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+
+        model = importlib.import_module("generator.xsgen.model")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            xs_env_root = root / "xs-env"
+            env_sh = xs_env_root / "env.sh"
+            emu_path = xs_env_root / "XiangShan" / "build" / "verilator-compile" / "emu"
+            diff_path = xs_env_root / "NEMU" / "build" / "riscv64-nemu-interpreter-so"
+            build_dir = root / "build"
+            bin_path = build_dir / "test.bin"
+            elf_path = build_dir / "test.elf"
+            stdout_log_path = build_dir / "stdout.log"
+            stderr_log_path = build_dir / "stderr.log"
+            run_meta_path = build_dir / "run_meta.json"
+
+            emu_path.parent.mkdir(parents=True, exist_ok=True)
+            diff_path.parent.mkdir(parents=True, exist_ok=True)
+            build_dir.mkdir(parents=True, exist_ok=True)
+
+            env_sh.write_text("#!/bin/sh\n")
+            emu_path.write_text("#!/bin/sh\nexit 1\n")
+            emu_path.chmod(0o755)
+            diff_path.write_text("stub diff\n")
+            bin_path.write_bytes(b"\x00")
+            elf_path.write_bytes(b"\x00")
+            stdout_log_path.write_text("")
+            stderr_log_path.write_text("")
+
+            artifacts = model.RunSeedArtifacts(
+                suite_name="demo",
+                target="xiangshan-verilator",
+                seed=4660,
+                run_batch="batch",
+                build_artifact=model.BuildArtifact(
+                    suite_name="demo",
+                    build_dir=build_dir,
+                    generated_suite_path=build_dir / "generated_suite.c",
+                    elf_path=elf_path,
+                    bin_path=bin_path,
+                    build_manifest_path=build_dir / "build_manifest.json",
+                ),
+                stdout_log_path=stdout_log_path,
+                stderr_log_path=stderr_log_path,
+                run_meta_path=run_meta_path,
+            )
+
+            def fake_run(command, **kwargs):
+                kwargs["stderr"].write("Core 0: Unknown trap code: 27\n")
+                kwargs["stderr"].flush()
+                return subprocess.CompletedProcess(command, 0)
+
+            with mock.patch.dict(
+                module.os.environ,
+                {"SNIPPETGEN_XS_ENV_SH": str(env_sh)},
+                clear=False,
+            ):
+                with mock.patch.object(module.subprocess, "run", side_effect=fake_run):
+                    result = module.run_target(artifacts=artifacts, timeout_s=5)
+
+        self.assertEqual("bad_trap", result.status)
+        self.assertIn("bad_trap", result.labels)
+        self.assertEqual("Unknown trap code: 27", result.notes)
+        self.assertEqual(27, result.finish_code)
+
     def test_xiangshan_runner_classifies_abort_from_logs(self) -> None:
         module_path = ROOT / "targets" / "xiangshan-verilator" / "run_target.py"
         spec = importlib.util.spec_from_file_location("xiangshan_run_target_abort_test", module_path)
@@ -686,6 +826,39 @@ class RunPipelineTest(unittest.TestCase):
                     str(seed_dir / "disasm"),
                     ledger["entries"][seed - 11]["disasm"],
                 )
+
+    def test_run_batch_writes_finish_code_to_run_meta_and_batch_meta(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                artifacts.stdout_log_path.write_text("")
+                artifacts.stderr_log_path.write_text("Core 0: Unknown trap code: 27\n")
+                return model.TargetRunResult(
+                    status="bad_trap",
+                    labels=("built", "ran", "bad_trap"),
+                    notes="Unknown trap code: 27",
+                    returncode=0,
+                    finish_code=27,
+                )
+
+            return run_target
+
+        ledger_path = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(11,),
+            target_loader=fake_target_loader,
+            run_batch_id="finish-code-batch",
+        )
+
+        ledger = json.loads(ledger_path.read_text())
+        seed_dir = self.run_root / "finish-code-batch" / "seed_11"
+        run_meta = json.loads((seed_dir / "run_meta.json").read_text())
+
+        self.assertEqual(27, ledger["entries"][0]["finish_code"])
+        self.assertEqual(27, run_meta["finish_code"])
 
     def test_run_batch_preserves_input_seed_order_under_parallel_completion(self) -> None:
         run_batch = importlib.import_module("generator.xsgen.run_batch")

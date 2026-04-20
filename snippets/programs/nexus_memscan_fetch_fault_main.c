@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "xsam/program_snippet.h"
+#include "xsam_xs_platform.h"
 #include "xsrt_trap.h"
 
 /*
@@ -13,7 +14,6 @@ enum {
   NEXUS_MEMSCAN_CAUSE_FETCH_ACCESS = 1u,
   NEXUS_MEMSCAN_BAD_HANDLER_COUNT = 31,
   NEXUS_MEMSCAN_BAD_FETCH_CAUSE = 32,
-  NEXUS_MEMSCAN_PMP_LOCK = 1u << 7,
 };
 
 static volatile uint64_t nexus_memscan_fetch_fault_count;
@@ -21,15 +21,8 @@ static volatile uint64_t nexus_memscan_fetch_last_cause;
 static volatile uintptr_t nexus_memscan_fetch_resume_pc;
 
 static void nexus_memscan_enable_exec_fault_window(void) {
-  const uintptr_t allow_all_s_mode = (uintptr_t) 31u << (8u * 7u);
-  const uintptr_t deny_addr = (0x90000000ull | ((0x10000ull >> 1) - 1ull)) >> 2;
-  const uintptr_t deny_napot_locked = (uintptr_t) NEXUS_MEMSCAN_PMP_LOCK | ((uintptr_t) 3u << 3);
-
-  __asm__ volatile("csrw pmpaddr15, %0" : : "r"(~(uintptr_t) 0) : "memory");
-  __asm__ volatile("csrw pmpcfg2, %0" : : "r"(allow_all_s_mode) : "memory");
-  __asm__ volatile("csrw pmpaddr1, %0" : : "r"(deny_addr) : "memory");
-  __asm__ volatile("csrw pmpcfg0, %0" : : "r"(deny_napot_locked << 8) : "memory");
-  __asm__ volatile("sfence.vma x0, x0" : : : "memory");
+  xsam_xs_pmp_init();
+  xsam_xs_pmp_enable_napot(1, 0x90000000ull, 0x10000ull, 1, 0u);
 }
 
 static xsrt_trap_frame_t *nexus_memscan_fetch_fault_handler(xsrt_trap_frame_t *frame) {
