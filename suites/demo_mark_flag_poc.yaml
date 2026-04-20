@@ -1,0 +1,10 @@
+suite: demo_mark_flag_poc
+target: xiangshan-verilator
+seed: 4660
+compose:
+  mode: sequence
+  snippets:
+    - init_basic_env
+    - demo_mark_flag
+    - check_demo_mark_flag
+    - finish_check

@@ -1,0 +1,5 @@
+id: check_demo_mark_flag
+kind: proc
+lang: c
+sources:
+  - snippets/examples/check_demo_mark_flag.c
