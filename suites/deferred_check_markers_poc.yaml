@@ -1,0 +1,13 @@
+suite: deferred_check_markers_poc
+target: xiangshan-verilator
+seed: 8601
+compose:
+  mode: sequence
+  run_snippets:
+    - init_basic_env
+    - deferred_mark_stage_a
+    - deferred_mark_stage_b
+  check_snippets:
+    - deferred_mark_stage_a
+    - deferred_mark_stage_b
+    - finish_check

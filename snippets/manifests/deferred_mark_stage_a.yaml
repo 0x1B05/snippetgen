@@ -1,0 +1,5 @@
+id: deferred_mark_stage_a
+kind: proc
+lang: c
+sources:
+  - snippets/deferred_check/deferred_mark_stage_a.c

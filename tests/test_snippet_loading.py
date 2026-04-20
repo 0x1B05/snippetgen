@@ -185,6 +185,14 @@ SCALAR_MISALIGN_PHASE3_FILES = [
     "suites/scalar_misalign_replay_probe_poc.yaml",
 ]
 
+DEFERRED_CHECK_FILES = [
+    "snippets/deferred_check/deferred_mark_stage_a.c",
+    "snippets/deferred_check/deferred_mark_stage_b.c",
+    "snippets/manifests/deferred_mark_stage_a.yaml",
+    "snippets/manifests/deferred_mark_stage_b.yaml",
+    "suites/deferred_check_markers_poc.yaml",
+]
+
 
 class SnippetLoadingTest(unittest.TestCase):
     def test_round2_files_exist(self) -> None:
@@ -259,6 +267,11 @@ class SnippetLoadingTest(unittest.TestCase):
 
     def test_scalar_misalign_phase3_files_exist(self) -> None:
         for relative_path in SCALAR_MISALIGN_PHASE3_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_deferred_check_files_exist(self) -> None:
+        for relative_path in DEFERRED_CHECK_FILES:
             with self.subTest(path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_file())
 
