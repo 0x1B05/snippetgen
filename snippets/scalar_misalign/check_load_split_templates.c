@@ -17,12 +17,10 @@ static int check_load_split_templates_check(xsrt_env_t *env) {
     return 402;
   }
 
-  if (xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_TEMPLATE_COUNT) != 6u) {
+  if (
+      xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_LOAD_SPLIT_SUMMARY) !=
+      (((uint64_t) XS_SCALAR_MISALIGN_LOAD_SPLIT_MAGIC << 32) | 6u)) {
     return 403;
-  }
-
-  if ((env->snippet_id & 0xffff0000u) != (XS_SCALAR_MISALIGN_LOAD_SPLIT_MAGIC & 0xffff0000u)) {
-    return 404;
   }
 
   return 0;

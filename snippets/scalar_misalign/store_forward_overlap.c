@@ -62,6 +62,7 @@ static int store_forward_overlap_run(xsrt_env_t *env) {
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FORWARD_VALUE0, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FORWARD_VALUE1, 0u);
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FORWARD_SUMMARY, 0u);
 
   xs_scalar_misalign_zero_region(xs_scalar_misalign_forward_arena, sizeof(xs_scalar_misalign_forward_arena));
 
@@ -89,6 +90,9 @@ static int store_forward_overlap_run(xsrt_env_t *env) {
     return XS_SCALAR_MISALIGN_RC_STORE_FORWARD + 2;
   }
 
+  xsrt_csr_write(
+      XS_SCALAR_MISALIGN_CSR_FORWARD_SUMMARY,
+      ((uint64_t) XS_SCALAR_MISALIGN_STORE_FORWARD_MAGIC << 32) | 2u);
   env->snippet_id = XS_SCALAR_MISALIGN_STORE_FORWARD_MAGIC ^ 2u;
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_STORE_FORWARD_COMPLETED;
   return 0;

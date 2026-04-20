@@ -1,0 +1,13 @@
+suite: scalar_misalign_fault_forward_combo_poc
+target: xiangshan-verilator
+seed: 8412
+compose:
+  mode: sequence
+  run_snippets:
+    - init_basic_env
+    - store_forward_overlap
+    - cross_page_faults
+  check_snippets:
+    - check_store_forward_overlap
+    - check_cross_page_faults
+    - finish_check

@@ -196,6 +196,7 @@ static int cross_page_faults_run(xsrt_env_t *env) {
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_TVAL0, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_TVAL1, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 0u);
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_SUMMARY, 0u);
 
   xs_scalar_misalign_fault_count = 0u;
   xs_scalar_misalign_fault_causes[0] = 0u;
@@ -244,6 +245,9 @@ static int cross_page_faults_run(xsrt_env_t *env) {
     return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 4;
   }
 
+  xsrt_csr_write(
+      XS_SCALAR_MISALIGN_CSR_CROSS_SUMMARY,
+      ((uint64_t) XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC << 32) | 2u);
   env->snippet_id = XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC ^ 2u;
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_CROSS_PAGE_COMPLETED;
   return 0;

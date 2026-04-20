@@ -64,6 +64,7 @@ static int store_split_templates_run(xsrt_env_t *env) {
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_STORE_SPLIT_ENTERED;
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_TEMPLATE_COUNT, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 0u);
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_STORE_SPLIT_SUMMARY, 0u);
 
   rc = xs_scalar_misalign_check_sw_case(&xs_scalar_misalign_store_arena[0], 13u, 0x11223344u, 311);
   if (rc != 0) {
@@ -91,6 +92,9 @@ static int store_split_templates_run(xsrt_env_t *env) {
   }
 
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_TEMPLATE_COUNT, 6u);
+  xsrt_csr_write(
+      XS_SCALAR_MISALIGN_CSR_STORE_SPLIT_SUMMARY,
+      ((uint64_t) XS_SCALAR_MISALIGN_STORE_SPLIT_MAGIC << 32) | 6u);
   env->snippet_id = XS_SCALAR_MISALIGN_STORE_SPLIT_MAGIC ^ 6u;
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_STORE_SPLIT_COMPLETED;
   return 0;

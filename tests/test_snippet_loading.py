@@ -185,6 +185,12 @@ SCALAR_MISALIGN_PHASE3_FILES = [
     "suites/scalar_misalign_replay_probe_poc.yaml",
 ]
 
+SCALAR_MISALIGN_FAMILY_COMBO_FILES = [
+    "suites/scalar_misalign_templates_combo_poc.yaml",
+    "suites/scalar_misalign_fault_forward_combo_poc.yaml",
+    "suites/scalar_misalign_family_combo_poc.yaml",
+]
+
 DEFERRED_CHECK_FILES = [
     "snippets/deferred_check/deferred_mark_stage_a.c",
     "snippets/deferred_check/deferred_mark_stage_b.c",
@@ -267,6 +273,11 @@ class SnippetLoadingTest(unittest.TestCase):
 
     def test_scalar_misalign_phase3_files_exist(self) -> None:
         for relative_path in SCALAR_MISALIGN_PHASE3_FILES:
+            with self.subTest(path=relative_path):
+                self.assertTrue((ROOT / relative_path).is_file())
+
+    def test_scalar_misalign_family_combo_files_exist(self) -> None:
+        for relative_path in SCALAR_MISALIGN_FAMILY_COMBO_FILES:
             with self.subTest(path=relative_path):
                 self.assertTrue((ROOT / relative_path).is_file())
 
@@ -682,6 +693,112 @@ class SnippetLoadingTest(unittest.TestCase):
                 "init_basic_env",
                 "replay_probe",
                 "check_replay_probe",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_scalar_misalign_templates_combo_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/scalar_misalign_templates_combo_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            ("init_basic_env", "load_split_templates", "store_split_templates"),
+            plan_first.run_snippet_ids,
+        )
+        self.assertEqual(
+            ("check_load_split_templates", "check_store_split_templates", "finish_check"),
+            plan_first.check_snippet_ids,
+        )
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "load_split_templates",
+                "store_split_templates",
+                "check_load_split_templates",
+                "check_store_split_templates",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_scalar_misalign_fault_forward_combo_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/scalar_misalign_fault_forward_combo_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            ("init_basic_env", "store_forward_overlap", "cross_page_faults"),
+            plan_first.run_snippet_ids,
+        )
+        self.assertEqual(
+            ("check_store_forward_overlap", "check_cross_page_faults", "finish_check"),
+            plan_first.check_snippet_ids,
+        )
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "store_forward_overlap",
+                "cross_page_faults",
+                "check_store_forward_overlap",
+                "check_cross_page_faults",
+                "finish_check",
+            ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_scalar_misalign_family_combo_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/scalar_misalign_family_combo_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "load_split_templates",
+                "store_split_templates",
+                "store_forward_overlap",
+                "cross_page_faults",
+            ),
+            plan_first.run_snippet_ids,
+        )
+        self.assertEqual(
+            (
+                "check_load_split_templates",
+                "check_store_split_templates",
+                "check_store_forward_overlap",
+                "check_cross_page_faults",
+                "finish_check",
+            ),
+            plan_first.check_snippet_ids,
+        )
+        self.assertEqual(
+            (
+                "init_basic_env",
+                "load_split_templates",
+                "store_split_templates",
+                "store_forward_overlap",
+                "cross_page_faults",
+                "check_load_split_templates",
+                "check_store_split_templates",
+                "check_store_forward_overlap",
+                "check_cross_page_faults",
                 "finish_check",
             ),
             plan_first.snippet_ids,

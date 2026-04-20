@@ -1,0 +1,17 @@
+suite: scalar_misalign_family_combo_poc
+target: xiangshan-verilator
+seed: 8413
+compose:
+  mode: sequence
+  run_snippets:
+    - init_basic_env
+    - load_split_templates
+    - store_split_templates
+    - store_forward_overlap
+    - cross_page_faults
+  check_snippets:
+    - check_load_split_templates
+    - check_store_split_templates
+    - check_store_forward_overlap
+    - check_cross_page_faults
+    - finish_check

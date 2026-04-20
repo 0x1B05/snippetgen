@@ -39,6 +39,9 @@ class BuildPipelineTest(unittest.TestCase):
         self.scalar_misalign_store_forward_search_build_dir = ROOT / "build" / "scalar_misalign_store_forward_search_poc"
         self.scalar_misalign_cross_page_search_build_dir = ROOT / "build" / "scalar_misalign_cross_page_fault_search_poc"
         self.scalar_misalign_replay_probe_build_dir = ROOT / "build" / "scalar_misalign_replay_probe_poc"
+        self.scalar_misalign_templates_combo_build_dir = ROOT / "build" / "scalar_misalign_templates_combo_poc"
+        self.scalar_misalign_fault_forward_combo_build_dir = ROOT / "build" / "scalar_misalign_fault_forward_combo_poc"
+        self.scalar_misalign_family_combo_build_dir = ROOT / "build" / "scalar_misalign_family_combo_poc"
         self.nexus_cputest_unalign_build_dir = ROOT / "build" / "nexus_cputest_unalign_poc"
         self.nexus_cputest_load_store_build_dir = ROOT / "build" / "nexus_cputest_load_store_poc"
         self.nexus_memscan_access_fault_build_dir = ROOT / "build" / "nexus_memscan_access_fault_poc"
@@ -91,6 +94,12 @@ class BuildPipelineTest(unittest.TestCase):
             shutil.rmtree(self.scalar_misalign_cross_page_search_build_dir)
         if self.scalar_misalign_replay_probe_build_dir.exists():
             shutil.rmtree(self.scalar_misalign_replay_probe_build_dir)
+        if self.scalar_misalign_templates_combo_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_templates_combo_build_dir)
+        if self.scalar_misalign_fault_forward_combo_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_fault_forward_combo_build_dir)
+        if self.scalar_misalign_family_combo_build_dir.exists():
+            shutil.rmtree(self.scalar_misalign_family_combo_build_dir)
         if self.nexus_cputest_unalign_build_dir.exists():
             shutil.rmtree(self.nexus_cputest_unalign_build_dir)
         if self.nexus_cputest_load_store_build_dir.exists():
@@ -825,6 +834,55 @@ class BuildPipelineTest(unittest.TestCase):
                 "init_basic_env",
                 "replay_probe",
                 "check_replay_probe",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_templates_combo_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_templates_combo_poc.yaml",
+            build_dir=self.scalar_misalign_templates_combo_build_dir,
+            suite_name="scalar_misalign_templates_combo_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "load_split_templates",
+                "store_split_templates",
+                "check_load_split_templates",
+                "check_store_split_templates",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_fault_forward_combo_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_fault_forward_combo_poc.yaml",
+            build_dir=self.scalar_misalign_fault_forward_combo_build_dir,
+            suite_name="scalar_misalign_fault_forward_combo_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "store_forward_overlap",
+                "cross_page_faults",
+                "check_store_forward_overlap",
+                "check_cross_page_faults",
+                "finish_check",
+            ],
+        )
+
+    def test_scalar_misalign_family_combo_suite_build_generates_artifacts_and_manifest(self) -> None:
+        self.assert_proc_check_suite_build(
+            suite_path="suites/scalar_misalign_family_combo_poc.yaml",
+            build_dir=self.scalar_misalign_family_combo_build_dir,
+            suite_name="scalar_misalign_family_combo_poc",
+            snippet_ids=[
+                "init_basic_env",
+                "load_split_templates",
+                "store_split_templates",
+                "store_forward_overlap",
+                "cross_page_faults",
+                "check_load_split_templates",
+                "check_store_split_templates",
+                "check_store_forward_overlap",
+                "check_cross_page_faults",
                 "finish_check",
             ],
         )
