@@ -314,6 +314,8 @@ class SnippetLoadingTest(unittest.TestCase):
             "snippets/interrupt/check_interrupt_response.c",
             "snippets/store_forward/misaligned_split_store_search.c",
             "snippets/store_forward/check_misaligned_split_store_search.c",
+            "snippets/deferred_check/deferred_mark_stage_a.c",
+            "snippets/deferred_check/deferred_mark_stage_b.c",
             "snippets/examples/demo_mark_flag.c",
             "snippets/examples/check_demo_mark_flag.c",
             "snippets/cbo/prefetchw_tl_denied_fault.c",
@@ -362,6 +364,50 @@ class SnippetLoadingTest(unittest.TestCase):
         snippet_sources = [
             "snippets/cbo/prefetchw_tl_denied_fault.c",
             "snippets/cbo/check_prefetchw_tl_denied_fault.c",
+        ]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            toolchain = importlib.import_module("generator.xsgen.toolchain")
+            gcc = toolchain.detect_toolchain()["gcc"]
+            for relative_path in snippet_sources:
+                src_path = ROOT / relative_path
+                out_path = Path(tmpdir) / (src_path.stem + ".o")
+                result = subprocess.run(
+                    [
+                        gcc,
+                        "-std=c11",
+                        "-Wall",
+                        "-Wextra",
+                        "-Werror",
+                        "-O2",
+                        "-march=rv64gcv_zicbop",
+                        "-mabi=lp64d",
+                        "-mcmodel=medany",
+                        "-ffreestanding",
+                        "-fno-asynchronous-unwind-tables",
+                        "-fno-builtin",
+                        "-fno-stack-protector",
+                        "-fno-tree-vectorize",
+                        "-fno-tree-slp-vectorize",
+                        "-I",
+                        str(ROOT / "runtime/include"),
+                        "-I",
+                        str(ROOT / "snippets/include"),
+                        "-c",
+                        str(src_path),
+                        "-o",
+                        str(out_path),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(0, result.returncode, msg=result.stderr)
+
+    def test_deferred_check_sources_compile(self) -> None:
+        snippet_sources = [
+            "snippets/deferred_check/deferred_mark_stage_a.c",
+            "snippets/deferred_check/deferred_mark_stage_b.c",
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -638,6 +684,29 @@ class SnippetLoadingTest(unittest.TestCase):
                 "check_replay_probe",
                 "finish_check",
             ),
+            plan_first.snippet_ids,
+        )
+        self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
+
+    def test_deferred_check_suite_produces_deterministic_plan(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+        suite = suite_loader.load_suite(ROOT / "suites/deferred_check_markers_poc.yaml")
+        plan_first = suite_loader.build_compose_plan(suite, db)
+        plan_second = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            ("init_basic_env", "deferred_mark_stage_a", "deferred_mark_stage_b"),
+            plan_first.run_snippet_ids,
+        )
+        self.assertEqual(
+            ("deferred_mark_stage_a", "deferred_mark_stage_b", "finish_check"),
+            plan_first.check_snippet_ids,
+        )
+        self.assertEqual(
+            ("init_basic_env", "deferred_mark_stage_a", "deferred_mark_stage_b", "finish_check"),
             plan_first.snippet_ids,
         )
         self.assertEqual(plan_first.snippet_ids, plan_second.snippet_ids)
