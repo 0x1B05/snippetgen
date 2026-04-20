@@ -12,5 +12,7 @@ typedef struct {
 } xsrt_snippet_desc_t;
 
 int xsrt_run_snippet(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);
+int xsrt_run_snippet_no_check(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);
+int xsrt_run_snippet_check_only(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);
 
 #endif

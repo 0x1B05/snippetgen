@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import textwrap
@@ -68,6 +69,8 @@ class RuntimeSurfaceTest(unittest.TestCase):
         self.assertIn("int (*check)(xsrt_env_t *env);", snippet_h)
         self.assertIn("void (*fini)(xsrt_env_t *env);", snippet_h)
         self.assertIn("int xsrt_run_snippet(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);", snippet_h)
+        self.assertIn("int xsrt_run_snippet_no_check(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);", snippet_h)
+        self.assertIn("int xsrt_run_snippet_check_only(xsrt_env_t *env, const xsrt_snippet_desc_t *snippet);", snippet_h)
 
         start_s = (ROOT / "runtime/arch/riscv64/start.S").read_text()
         self.assertIn("main", start_s)
@@ -86,6 +89,164 @@ class RuntimeSurfaceTest(unittest.TestCase):
 
         self.assertIn("xsrt_reset_mscratch_for_sync_traps();", intr_c)
 
+    def test_xsrt_snippet_helpers_execute_expected_sequences(self) -> None:
+        cc = shutil.which("cc")
+        if cc is None:
+            self.skipTest("host cc not available")
+
+        smoke_c = textwrap.dedent(
+            """
+            #include <stdint.h>
+
+            #include "xs_snippet.h"
+
+            static int order[4];
+            static int order_count = 0;
+            static int check_calls = 0;
+
+            static int mark_init(xsrt_env_t *env) {
+              order[order_count++] = 1;
+              env->test_id = 7u;
+              return 0;
+            }
+
+            static int mark_run(xsrt_env_t *env) {
+              order[order_count++] = 2;
+              env->snippet_id = 99u;
+              return 0;
+            }
+
+            static int mark_check(xsrt_env_t *env) {
+              order[order_count++] = 3;
+              check_calls++;
+              return env->snippet_id == 99u ? 0 : 11;
+            }
+
+            static void mark_fini(xsrt_env_t *env) {
+              order[order_count++] = 4;
+              env->flags |= 1u;
+            }
+
+            int main(void) {
+              xsrt_env_t env = {0};
+              const xsrt_snippet_desc_t snippet = {
+                .id = "smoke",
+                .init = mark_init,
+                .run = mark_run,
+                .check = mark_check,
+                .fini = mark_fini,
+              };
+
+              if (xsrt_run_snippet(&env, &snippet) != 0) {
+                return 21;
+              }
+
+              if (order_count != 4) {
+                return 22;
+              }
+
+              for (int i = 0; i < 4; ++i) {
+                if (order[i] != i + 1) {
+                  return 23;
+                }
+              }
+
+              if (check_calls != 1) {
+                return 24;
+              }
+
+              if ((env.flags & 1u) == 0u || env.test_id != 7u || env.snippet_id != 99u) {
+                return 25;
+              }
+
+              env = (xsrt_env_t){0};
+              order_count = 0;
+              check_calls = 0;
+              if (xsrt_run_snippet_no_check(&env, &snippet) != 0) {
+                return 26;
+              }
+
+              if (order_count != 3) {
+                return 27;
+              }
+
+              if (order[0] != 1 || order[1] != 2 || order[2] != 4) {
+                return 28;
+              }
+
+              if (check_calls != 0) {
+                return 29;
+              }
+
+              if ((env.flags & 1u) == 0u || env.test_id != 7u || env.snippet_id != 99u) {
+                return 30;
+              }
+
+              env = (xsrt_env_t){0};
+              env.snippet_id = 99u;
+              order_count = 0;
+              check_calls = 0;
+              if (xsrt_run_snippet_check_only(&env, &snippet) != 0) {
+                return 31;
+              }
+
+              if (order_count != 1 || order[0] != 3) {
+                return 32;
+              }
+
+              if (check_calls != 1) {
+                return 33;
+              }
+
+              if (env.flags != 0u || env.test_id != 0u || env.snippet_id != 99u) {
+                return 34;
+              }
+
+              return 0;
+            }
+            """
+        ).strip()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            smoke_path = Path(tmpdir) / "snippet_runtime_smoke.c"
+            executable_path = Path(tmpdir) / "snippet_runtime_smoke"
+            smoke_path.write_text(smoke_c)
+
+            compile_result = subprocess.run(
+                [
+                    cc,
+                    "-std=c11",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-O2",
+                    "-I",
+                    str(ROOT / "runtime/include"),
+                    "-I",
+                    str(ROOT / "snippets/include"),
+                    str(smoke_path),
+                    str(ROOT / "runtime/src/xsrt_snippet.c"),
+                    "-o",
+                    str(executable_path),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, compile_result.returncode, msg=compile_result.stderr)
+
+            run_result = subprocess.run(
+                [str(executable_path)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                0,
+                run_result.returncode,
+                msg=f"stdout:\n{run_result.stdout}\nstderr:\n{run_result.stderr}",
+            )
+
     def test_runtime_c_surfaces_cross_compile(self) -> None:
         smoke_c = textwrap.dedent(
             """
@@ -99,6 +260,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
 
             static int order[4];
             static int order_count = 0;
+            static int check_calls = 0;
 
             static int mark_init(xsrt_env_t *env) {
               order[order_count++] = 1;
@@ -115,6 +277,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
 
             static int mark_check(xsrt_env_t *env) {
               order[order_count++] = 3;
+              check_calls++;
               return env->snippet_id == 99u ? 0 : 11;
             }
 
@@ -124,7 +287,7 @@ class RuntimeSurfaceTest(unittest.TestCase):
             }
 
             int main(void) {
-              xsrt_env_t env;
+              xsrt_env_t env = {0};
               const xsrt_snippet_desc_t snippet = {
                 .id = "smoke",
                 .init = mark_init,
@@ -168,6 +331,49 @@ class RuntimeSurfaceTest(unittest.TestCase):
               xsrt_finish_fail(&env, 77u);
               if (env.finish_code != 77u) {
                 return 27;
+              }
+
+              env = (xsrt_env_t){0};
+              order_count = 0;
+              check_calls = 0;
+              if (xsrt_run_snippet_no_check(&env, &snippet) != 0) {
+                return 28;
+              }
+
+              if (order_count != 3) {
+                return 29;
+              }
+
+              if (order[0] != 1 || order[1] != 2 || order[2] != 4) {
+                return 30;
+              }
+
+              if (check_calls != 0) {
+                return 31;
+              }
+
+              if ((env.flags & 1u) == 0u || env.test_id != 7u || env.snippet_id != 99u) {
+                return 32;
+              }
+
+              env = (xsrt_env_t){0};
+              env.snippet_id = 99u;
+              order_count = 0;
+              check_calls = 0;
+              if (xsrt_run_snippet_check_only(&env, &snippet) != 0) {
+                return 33;
+              }
+
+              if (order_count != 1 || order[0] != 3) {
+                return 34;
+              }
+
+              if (check_calls != 1) {
+                return 35;
+              }
+
+              if (env.flags != 0u || env.test_id != 0u || env.snippet_id != 99u) {
+                return 36;
               }
 
               return 0;
