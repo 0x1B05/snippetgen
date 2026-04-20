@@ -42,18 +42,49 @@ def load_suite(path: Path) -> SuiteSpec:
     if mode != "sequence":
         raise ValueError(f"{path} compose mode '{mode}' is future-only in ELF-first PoC")
 
-    snippet_ids = compose.get("snippets")
-    if not isinstance(snippet_ids, list) or not snippet_ids:
-        raise ValueError(f"{path} field 'compose.snippets' must be a non-empty list")
-    if not all(isinstance(item, str) and item for item in snippet_ids):
-        raise ValueError(f"{path} field 'compose.snippets' contains an invalid snippet id")
+    legacy_present = "snippets" in compose
+    deferred_present = "run_snippets" in compose or "check_snippets" in compose
+
+    legacy_snippet_ids = compose.get("snippets")
+    run_snippet_ids = compose.get("run_snippets")
+    check_snippet_ids = compose.get("check_snippets")
+
+    if legacy_present and deferred_present:
+        raise ValueError(f"{path} cannot mix compose.snippets with run_snippets/check_snippets")
+
+    if legacy_present:
+        if not isinstance(legacy_snippet_ids, list) or not legacy_snippet_ids:
+            raise ValueError(f"{path} field 'compose.snippets' must be a non-empty list")
+        if not all(isinstance(item, str) and item for item in legacy_snippet_ids):
+            raise ValueError(f"{path} field 'compose.snippets' contains an invalid snippet id")
+
+        return SuiteSpec(
+            name=suite_name,
+            target=target,
+            seed=raw_seed,
+            compose_mode=str(mode),
+            snippet_ids=tuple(legacy_snippet_ids),
+        )
+
+    if not deferred_present:
+        raise ValueError(f"{path} compose section requires snippets or run_snippets/check_snippets")
+    if not isinstance(run_snippet_ids, list) or not run_snippet_ids:
+        raise ValueError(f"{path} field 'compose.run_snippets' must be a non-empty list")
+    if not isinstance(check_snippet_ids, list) or not check_snippet_ids:
+        raise ValueError(f"{path} field 'compose.check_snippets' must be a non-empty list")
+    if not all(isinstance(item, str) and item for item in [*run_snippet_ids, *check_snippet_ids]):
+        raise ValueError(f"{path} deferred compose contains an invalid snippet id")
+
+    snippet_ids = tuple(dict.fromkeys([*run_snippet_ids, *check_snippet_ids]))
 
     return SuiteSpec(
         name=suite_name,
         target=target,
         seed=raw_seed,
         compose_mode=str(mode),
-        snippet_ids=tuple(snippet_ids),
+        snippet_ids=snippet_ids,
+        run_snippet_ids=tuple(run_snippet_ids),
+        check_snippet_ids=tuple(check_snippet_ids),
     )
 
 
@@ -73,4 +104,6 @@ def build_compose_plan(
         seed=suite.seed,
         snippet_ids=suite.snippet_ids,
         snippets=tuple(resolved_snippets),
+        run_snippet_ids=suite.run_snippet_ids,
+        check_snippet_ids=suite.check_snippet_ids,
     )

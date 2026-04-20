@@ -901,6 +901,155 @@ class SnippetLoadingTest(unittest.TestCase):
                     with self.assertRaisesRegex(ValueError, "invalid seed"):
                         suite_loader.load_suite(suite_path)
 
+    def test_suite_loader_accepts_deferred_check_schema(self) -> None:
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            suite_path = Path(tmpdir) / "deferred.yaml"
+            suite_path.write_text(
+                textwrap.dedent(
+                    """
+                    suite: deferred_suite
+                    target: xiangshan-verilator
+                    seed: 9
+                    compose:
+                      mode: sequence
+                      run_snippets:
+                        - init_basic_env
+                        - arm_timer
+                        - unaligned_load
+                      check_snippets:
+                        - unaligned_load
+                        - finish_check
+                    """
+                ).strip()
+            )
+
+            suite = suite_loader.load_suite(suite_path)
+
+        self.assertEqual(
+            ("init_basic_env", "arm_timer", "unaligned_load"),
+            suite.run_snippet_ids,
+        )
+        self.assertEqual(
+            ("unaligned_load", "finish_check"),
+            suite.check_snippet_ids,
+        )
+        self.assertEqual(
+            ("init_basic_env", "arm_timer", "unaligned_load", "finish_check"),
+            suite.snippet_ids,
+        )
+
+    def test_suite_loader_rejects_mixed_legacy_and_deferred_schema(self) -> None:
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            suite_path = Path(tmpdir) / "mixed.yaml"
+            suite_path.write_text(
+                textwrap.dedent(
+                    """
+                    suite: mixed_suite
+                    target: xiangshan-verilator
+                    seed: 9
+                    compose:
+                      mode: sequence
+                      snippets:
+                        - init_basic_env
+                      run_snippets:
+                        - arm_timer
+                      check_snippets:
+                        - finish_check
+                    """
+                ).strip()
+            )
+
+            with self.assertRaisesRegex(ValueError, "cannot mix"):
+                suite_loader.load_suite(suite_path)
+
+    def test_suite_loader_rejects_mixed_schema_when_other_side_is_yaml_null(self) -> None:
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_root = Path(tmpdir)
+            cases = {
+                "legacy_null_with_deferred": """
+                    suite: mixed_null_legacy
+                    target: xiangshan-verilator
+                    seed: 9
+                    compose:
+                      mode: sequence
+                      snippets: null
+                      run_snippets:
+                        - init_basic_env
+                      check_snippets:
+                        - finish_check
+                """,
+                "deferred_null_with_legacy": """
+                    suite: mixed_null_deferred
+                    target: xiangshan-verilator
+                    seed: 9
+                    compose:
+                      mode: sequence
+                      snippets:
+                        - init_basic_env
+                      run_snippets: null
+                      check_snippets:
+                        - finish_check
+                """,
+            }
+
+            for name, raw_yaml in cases.items():
+                suite_path = tmp_root / f"{name}.yaml"
+                suite_path.write_text(textwrap.dedent(raw_yaml).strip())
+                with self.subTest(case=name):
+                    with self.assertRaisesRegex(ValueError, "cannot mix"):
+                        suite_loader.load_suite(suite_path)
+
+    def test_build_compose_plan_preserves_deferred_phase_order(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        db = snippet_db.load_snippet_db(ROOT)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            suite_path = Path(tmpdir) / "deferred_plan.yaml"
+            suite_path.write_text(
+                textwrap.dedent(
+                    """
+                    suite: deferred_plan
+                    target: xiangshan-verilator
+                    seed: 11
+                    compose:
+                      mode: sequence
+                      run_snippets:
+                        - init_basic_env
+                        - arm_timer
+                        - unaligned_load
+                      check_snippets:
+                        - unaligned_load
+                        - arm_timer
+                        - finish_check
+                    """
+                ).strip()
+            )
+
+            suite = suite_loader.load_suite(suite_path)
+
+        plan = suite_loader.build_compose_plan(suite, db)
+
+        self.assertEqual(
+            ("init_basic_env", "arm_timer", "unaligned_load"),
+            plan.run_snippet_ids,
+        )
+        self.assertEqual(
+            ("unaligned_load", "arm_timer", "finish_check"),
+            plan.check_snippet_ids,
+        )
+        self.assertEqual(
+            ("init_basic_env", "arm_timer", "unaligned_load", "finish_check"),
+            plan.snippet_ids,
+        )
+
     def test_cli_dump_plan_and_list_snippets(self) -> None:
         list_result = subprocess.run(
             ["python3", "generator/cli.py", "list-snippets"],

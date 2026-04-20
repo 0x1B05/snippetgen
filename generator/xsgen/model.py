@@ -20,6 +20,8 @@ class SuiteSpec:
     seed: int
     compose_mode: str
     snippet_ids: tuple[str, ...]
+    run_snippet_ids: tuple[str, ...] | None = None
+    check_snippet_ids: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class ComposePlan:
     seed: int
     snippet_ids: tuple[str, ...]
     snippets: tuple[SnippetSpec, ...]
+    run_snippet_ids: tuple[str, ...] | None = None
+    check_snippet_ids: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
