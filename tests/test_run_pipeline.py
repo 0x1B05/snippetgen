@@ -1023,6 +1023,58 @@ class RunPipelineTest(unittest.TestCase):
         self.assertTrue(second.parent.parent == self.run_root)
         self.assertFalse((self.run_root / "run_ledger.json").exists())
 
+    def test_run_batch_explicit_batch_id_can_be_reused_and_recreates_logs(self) -> None:
+        run_batch = importlib.import_module("generator.xsgen.run_batch")
+        model = importlib.import_module("generator.xsgen.model")
+        call_count = 0
+
+        def fake_target_loader(repo_root: Path, target: str):
+            def run_target(*, artifacts, timeout_s):
+                nonlocal call_count
+                call_count += 1
+                artifacts.stdout_log_path.write_text(f"stdout run {call_count}\n")
+                artifacts.stderr_log_path.write_text("")
+                return model.TargetRunResult(
+                    status="ran",
+                    labels=("built", "ran"),
+                    notes=f"run {call_count}",
+                    returncode=0,
+                )
+
+            return run_target
+
+        batch_id = "reused-batch"
+        first = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(41,),
+            target_loader=fake_target_loader,
+            run_batch_id=batch_id,
+        )
+
+        seed_dir = self.run_root / batch_id / "seed_41"
+        self.assertTrue((seed_dir / "stdout.log").is_file())
+        (seed_dir / "stdout.log").unlink()
+
+        second = run_batch.run_suite_batch(
+            repo_root=ROOT,
+            suite_path=ROOT / "suites" / "vsetvl_interrupt_path_poc.yaml",
+            seed_values=(41,),
+            target_loader=fake_target_loader,
+            run_batch_id=batch_id,
+        )
+
+        self.assertEqual(first, second)
+        self.assertTrue((seed_dir / "stdout.log").is_file())
+        self.assertEqual("stdout run 2\n", (seed_dir / "stdout.log").read_text())
+
+        ledger = json.loads(second.read_text())
+        run_meta = json.loads((seed_dir / "run_meta.json").read_text())
+        self.assertEqual("ran", ledger["entries"][0]["status"])
+        self.assertEqual("ran", run_meta["status"])
+        self.assertEqual("run 2", ledger["entries"][0]["notes"])
+        self.assertEqual("run 2", run_meta["notes"])
+
 
 if __name__ == "__main__":
     unittest.main()
