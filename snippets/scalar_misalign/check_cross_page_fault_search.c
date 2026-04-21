@@ -17,7 +17,8 @@ static int check_cross_page_fault_search_check(xsrt_env_t *env) {
     return 452;
   }
 
-  if (xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_PROBE_COUNT) == 0u) {
+  if ((xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_CROSS_SEARCH_SUMMARY) & 0xffff0000u) !=
+      (XS_SCALAR_MISALIGN_CROSS_PAGE_SEARCH_MAGIC & 0xffff0000u)) {
     return 453;
   }
 

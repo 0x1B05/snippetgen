@@ -36,6 +36,9 @@
   - `store_split_templates`
   - `store_forward_overlap`
   - `cross_page_faults`
+- default / minimum `run-count`: `5`
+- when `run-count` exceeds the unique pool size, generator keeps extending the suite by
+  reshuffling the same safe deterministic pool instead of pulling in less-stable probe snippets
 - check map:
   - `load_split_templates -> check_load_split_templates`
   - `store_split_templates -> check_store_split_templates`
@@ -53,6 +56,8 @@
 - `--pool`
 - `--count`
 - `--run-count`
+  - defaults to the pool default
+  - `scalar_misalign_full` rejects values below `5`
 - `--seed`
 - `--output-dir`
 - `--prefix`
@@ -94,6 +99,8 @@ compose:
 
 - CLI can list pools
 - CLI can generate `N` deferred-check suites
+- default generated `scalar_misalign_full` suites contain more than `10` snippet phases
 - Generated suites round-trip through suite loader
 - Generated suites can build
 - A generated batch for `scalar_misalign_full` can be run on real `emu`
+  with raised cycle / instruction limits for the longer suites

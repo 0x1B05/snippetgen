@@ -15,7 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 from generator.xsgen.snippet_db import load_snippet_db
 from generator.xsgen.suite_loader import build_compose_plan, load_suite
 from generator.xsgen.emitter import emit_harness
-from generator.xsgen.suite_generator import list_suite_pools, write_generated_suites
+from generator.xsgen.suite_generator import list_suite_pools, load_suite_pool, write_generated_suites
 from generator.xsgen.toolchain import artifact_paths_for_suite, build_artifacts
 from generator.xsgen.run_batch import normalize_seeds, run_suite_batch
 
@@ -100,12 +100,15 @@ def cmd_run(args: argparse.Namespace) -> int:
 
 def cmd_generate_suites(args: argparse.Namespace) -> int:
     output_dir = None if args.output_dir is None else Path(args.output_dir)
+    run_count = args.run_count
+    if run_count is None:
+        run_count = load_suite_pool(args.pool).default_run_count
     try:
         index_path = write_generated_suites(
             repo_root=REPO_ROOT,
             pool_name=args.pool,
             suite_count=args.count,
-            run_count=args.run_count,
+            run_count=run_count,
             generator_seed=args.seed,
             output_dir=output_dir,
             prefix=args.prefix,
@@ -148,7 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser = subparsers.add_parser("generate-suites")
     generate_parser.add_argument("--pool", required=True, choices=list_suite_pools())
     generate_parser.add_argument("--count", type=int, required=True)
-    generate_parser.add_argument("--run-count", type=int, default=4)
+    generate_parser.add_argument("--run-count", type=int)
     generate_parser.add_argument("--seed", type=int, required=True)
     generate_parser.add_argument("--output-dir")
     generate_parser.add_argument("--prefix")

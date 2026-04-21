@@ -1310,8 +1310,6 @@ class SnippetLoadingTest(unittest.TestCase):
                     "scalar_misalign_full",
                     "--count",
                     "2",
-                    "--run-count",
-                    "3",
                     "--seed",
                     "20260421",
                     "--prefix",
@@ -1332,7 +1330,7 @@ class SnippetLoadingTest(unittest.TestCase):
             payload = json.loads(index_path.read_text())
             self.assertEqual("scalar_misalign_full", payload["pool"])
             self.assertEqual(2, payload["suite_count"])
-            self.assertEqual(3, payload["run_count"])
+            self.assertEqual(5, payload["run_count"])
             self.assertEqual(2, len(payload["suites"]))
             self.assertEqual(str(output_dir.resolve()), str((ROOT / payload["output_dir"]).resolve()))
 
@@ -1360,10 +1358,11 @@ class SnippetLoadingTest(unittest.TestCase):
                 self.assertEqual(f"scalar_misalign_full_rand_{index:03d}", suite.name)
                 self.assertEqual("init_basic_env", plan.run_snippet_ids[0])
                 self.assertEqual("finish_check", plan.check_snippet_ids[-1])
-                self.assertEqual(4, len(plan.run_snippet_ids))
-                self.assertEqual(4, len(plan.check_snippet_ids))
+                self.assertEqual(6, len(plan.run_snippet_ids))
+                self.assertEqual(6, len(plan.check_snippet_ids))
                 self.assertTrue(set(plan.run_snippet_ids[1:]).issubset(valid_run_ids))
                 self.assertTrue(set(plan.check_snippet_ids[:-1]).issubset(valid_check_ids))
+                self.assertGreater(len(plan.run_snippet_ids) + len(plan.check_snippet_ids), 10)
 
     def test_generate_suites_reports_clean_validation_error(self) -> None:
         result = subprocess.run(
@@ -1390,6 +1389,31 @@ class SnippetLoadingTest(unittest.TestCase):
         self.assertIn("suite_count must be positive", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
+    def test_generate_suites_rejects_too_small_run_count_for_scalar_misalign_full(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "generator/cli.py",
+                "generate-suites",
+                "--pool",
+                "scalar_misalign_full",
+                "--count",
+                "1",
+                "--run-count",
+                "4",
+                "--seed",
+                "7",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("run_count 4 is below minimum 5", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_generate_suites_rejects_invalid_prefix_without_traceback(self) -> None:
         result = subprocess.run(
             [
@@ -1401,7 +1425,7 @@ class SnippetLoadingTest(unittest.TestCase):
                 "--count",
                 "1",
                 "--run-count",
-                "1",
+                "5",
                 "--seed",
                 "7",
                 "--prefix",
@@ -1429,7 +1453,7 @@ class SnippetLoadingTest(unittest.TestCase):
                     "--count",
                     "1",
                     "--run-count",
-                    "1",
+                    "5",
                     "--seed",
                     "7",
                     "--prefix",
@@ -1464,7 +1488,7 @@ class SnippetLoadingTest(unittest.TestCase):
                         "--count",
                         "1",
                         "--run-count",
-                        "2",
+                        "5",
                         "--seed",
                         "20260421",
                         "--prefix",
@@ -1501,7 +1525,7 @@ class SnippetLoadingTest(unittest.TestCase):
                     "--count",
                     "1",
                     "--run-count",
-                    "1",
+                    "5",
                     "--seed",
                     "7",
                     "--prefix",

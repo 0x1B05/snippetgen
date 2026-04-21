@@ -80,6 +80,7 @@ static int store_forward_search_run(xsrt_env_t *env) {
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_VALUE0, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_VALUE1, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_VALUE2, 0u);
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FORWARD_SEARCH_SUMMARY, 0u);
 
   lane = (unsigned long) (env->seed | 1u);
   repeat_count = 3u + (unsigned long) ((env->seed >> 16) & 0x3u);
@@ -130,6 +131,9 @@ static int store_forward_search_run(xsrt_env_t *env) {
   env->snippet_id = XS_SCALAR_MISALIGN_STORE_FORWARD_SEARCH_MAGIC ^ (uint64_t) repeat_count;
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_STORE_FORWARD_SEARCH_COMPLETED;
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_COUNT, repeat_count);
+  xsrt_csr_write(
+      XS_SCALAR_MISALIGN_CSR_FORWARD_SEARCH_SUMMARY,
+      XS_SCALAR_MISALIGN_STORE_FORWARD_SEARCH_MAGIC ^ repeat_count);
   return 0;
 }
 

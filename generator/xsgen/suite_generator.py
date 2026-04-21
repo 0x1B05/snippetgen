@@ -21,6 +21,8 @@ class SuitePool:
     target: str = SUPPORTED_TARGET
     init_snippet: str = "init_basic_env"
     finish_check_snippet: str = "finish_check"
+    default_run_count: int = 1
+    min_run_count: int = 1
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,8 @@ SCALAR_MISALIGN_FULL_POOL = SuitePool(
         "store_forward_overlap": "check_store_forward_overlap",
         "cross_page_faults": "check_cross_page_faults",
     },
+    default_run_count=5,
+    min_run_count=5,
 )
 
 SUITE_POOLS: dict[str, SuitePool] = {
@@ -108,19 +112,26 @@ def generate_suites(
         raise ValueError(f"suite_count must be positive: {suite_count}")
     if run_count < 1:
         raise ValueError(f"run_count must be positive: {run_count}")
-    if run_count > len(pool.run_pool):
+    if run_count < pool.min_run_count:
         raise ValueError(
-            f"run_count {run_count} exceeds pool size {len(pool.run_pool)} for {pool.name}"
+            f"run_count {run_count} is below minimum {pool.min_run_count} for {pool.name}"
         )
     if generator_seed < 0:
         raise ValueError(f"generator_seed must be non-negative: {generator_seed}")
+    if not pool.run_pool:
+        raise ValueError(f"run_pool must not be empty for {pool.name}")
 
     rng = random.Random(generator_seed)
     generated: list[GeneratedSuite] = []
 
     for index in range(suite_count):
         suite_seed = rng.randrange(1, 1 << 31)
-        selected_runs = list(rng.sample(pool.run_pool, run_count))
+        selected_runs: list[str] = []
+        while len(selected_runs) < run_count:
+            round_runs = list(pool.run_pool)
+            rng.shuffle(round_runs)
+            remaining = run_count - len(selected_runs)
+            selected_runs.extend(round_runs[:remaining])
         selected_checks = [pool.check_map[snippet_id] for snippet_id in selected_runs]
         rng.shuffle(selected_checks)
 

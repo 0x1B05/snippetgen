@@ -9,11 +9,12 @@ static int check_replay_probe_check(xsrt_env_t *env) {
     return -1;
   }
 
-  if ((env->snippet_id & 0xffff0000u) != (XS_SCALAR_MISALIGN_REPLAY_PROBE_MAGIC & 0xffff0000u)) {
+  if ((xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_REPLAY_SUMMARY) & 0xffff0000u) !=
+      (XS_SCALAR_MISALIGN_REPLAY_PROBE_MAGIC & 0xffff0000u)) {
     return 461;
   }
 
-  if (xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_PROBE_COUNT) < 4u) {
+  if ((xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_REPLAY_SUMMARY) ^ XS_SCALAR_MISALIGN_REPLAY_PROBE_MAGIC) < 4u) {
     return 462;
   }
 

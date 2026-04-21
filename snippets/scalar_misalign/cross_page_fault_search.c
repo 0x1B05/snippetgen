@@ -195,6 +195,7 @@ static int cross_page_fault_search_run(xsrt_env_t *env) {
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_CROSS_PAGE_SEARCH_ENTERED;
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_COUNT, 0u);
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_SEARCH_SUMMARY, 0u);
 
   repeats = 1u + (unsigned) ((env->seed >> 8) & 0x0u);
 
@@ -237,6 +238,9 @@ static int cross_page_fault_search_run(xsrt_env_t *env) {
   env->snippet_id = XS_SCALAR_MISALIGN_CROSS_PAGE_SEARCH_MAGIC ^ (uint64_t) repeats;
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_CROSS_PAGE_SEARCH_COMPLETED;
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_COUNT, repeats);
+  xsrt_csr_write(
+      XS_SCALAR_MISALIGN_CSR_CROSS_SEARCH_SUMMARY,
+      XS_SCALAR_MISALIGN_CROSS_PAGE_SEARCH_MAGIC ^ (uint64_t) repeats);
   return 0;
 }
 

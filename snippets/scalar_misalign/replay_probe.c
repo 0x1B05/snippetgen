@@ -64,6 +64,7 @@ static int replay_probe_run(xsrt_env_t *env) {
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_VALUE0, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_VALUE1, 0u);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_VALUE2, 0u);
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_REPLAY_SUMMARY, 0u);
 
   rounds = 4u + (unsigned long) ((env->seed >> 16) & 0x3u);
   lane = (unsigned long) (env->seed | 1u);
@@ -96,6 +97,9 @@ static int replay_probe_run(xsrt_env_t *env) {
 
   env->snippet_id = XS_SCALAR_MISALIGN_REPLAY_PROBE_MAGIC ^ (uint64_t) rounds;
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_PROBE_COUNT, rounds);
+  xsrt_csr_write(
+      XS_SCALAR_MISALIGN_CSR_REPLAY_SUMMARY,
+      XS_SCALAR_MISALIGN_REPLAY_PROBE_MAGIC ^ (uint64_t) rounds);
   return 0;
 }
 

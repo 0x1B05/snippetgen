@@ -2,12 +2,14 @@
   "generator_seed": 20260421,
   "output_dir": "docs/evidence/random-suite-generation/generated_suites",
   "pool": "scalar_misalign_full",
-  "run_count": 3,
+  "run_count": 5,
   "suite_count": 3,
   "suites": [
     {
       "check_snippets": [
         "check_load_split_templates",
+        "check_store_split_templates",
+        "check_cross_page_faults",
         "check_cross_page_faults",
         "check_store_forward_overlap",
         "finish_check"
@@ -15,9 +17,11 @@
       "path": "docs/evidence/random-suite-generation/generated_suites/record_scalar_misalign_full_rand_000.yaml",
       "run_snippets": [
         "init_basic_env",
-        "store_forward_overlap",
+        "store_split_templates",
+        "load_split_templates",
         "cross_page_faults",
-        "load_split_templates"
+        "store_forward_overlap",
+        "cross_page_faults"
       ],
       "seed": 1651693091,
       "suite": "record_scalar_misalign_full_rand_000"
@@ -25,35 +29,43 @@
     {
       "check_snippets": [
         "check_load_split_templates",
-        "check_cross_page_faults",
+        "check_store_forward_overlap",
+        "check_load_split_templates",
         "check_store_split_templates",
+        "check_cross_page_faults",
         "finish_check"
       ],
       "path": "docs/evidence/random-suite-generation/generated_suites/record_scalar_misalign_full_rand_001.yaml",
       "run_snippets": [
         "init_basic_env",
-        "cross_page_faults",
+        "store_forward_overlap",
         "store_split_templates",
+        "cross_page_faults",
+        "load_split_templates",
         "load_split_templates"
       ],
-      "seed": 891246368,
+      "seed": 969273782,
       "suite": "record_scalar_misalign_full_rand_001"
     },
     {
       "check_snippets": [
+        "check_cross_page_faults",
         "check_store_forward_overlap",
         "check_store_split_templates",
         "check_load_split_templates",
+        "check_store_split_templates",
         "finish_check"
       ],
       "path": "docs/evidence/random-suite-generation/generated_suites/record_scalar_misalign_full_rand_002.yaml",
       "run_snippets": [
         "init_basic_env",
         "store_forward_overlap",
+        "store_split_templates",
+        "cross_page_faults",
         "load_split_templates",
         "store_split_templates"
       ],
-      "seed": 321564562,
+      "seed": 1043936655,
       "suite": "record_scalar_misalign_full_rand_002"
     }
   ]

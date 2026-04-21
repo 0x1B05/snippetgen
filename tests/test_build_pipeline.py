@@ -905,8 +905,6 @@ class BuildPipelineTest(unittest.TestCase):
                     "scalar_misalign_full",
                     "--count",
                     "1",
-                    "--run-count",
-                    "3",
                     "--seed",
                     "20260421",
                     "--prefix",
