@@ -110,7 +110,7 @@ def cmd_generate_suites(args: argparse.Namespace) -> int:
             output_dir=output_dir,
             prefix=args.prefix,
         )
-    except ValueError as exc:
+    except (OSError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
     print(index_path)
     return 0

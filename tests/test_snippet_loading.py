@@ -1296,8 +1296,11 @@ class SnippetLoadingTest(unittest.TestCase):
         snippet_db = importlib.import_module("generator.xsgen.snippet_db")
         suite_loader = importlib.import_module("generator.xsgen.suite_loader")
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        build_root = ROOT / "build"
+        build_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=build_root) as tmpdir:
             output_dir = Path(tmpdir) / "generated"
+            relative_output_dir = output_dir.relative_to(ROOT)
             result = subprocess.run(
                 [
                     "python3",
@@ -1314,7 +1317,7 @@ class SnippetLoadingTest(unittest.TestCase):
                     "--prefix",
                     "scalar_misalign_full_rand",
                     "--output-dir",
-                    str(output_dir),
+                    str(relative_output_dir),
                 ],
                 cwd=ROOT,
                 check=False,
@@ -1412,6 +1415,108 @@ class SnippetLoadingTest(unittest.TestCase):
 
         self.assertNotEqual(0, result.returncode)
         self.assertIn("invalid suite prefix", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_generate_suites_rejects_output_dir_outside_repo_without_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as outside_dir:
+            result = subprocess.run(
+                [
+                    "python3",
+                    "generator/cli.py",
+                    "generate-suites",
+                    "--pool",
+                    "scalar_misalign_full",
+                    "--count",
+                    "1",
+                    "--run-count",
+                    "1",
+                    "--seed",
+                    "7",
+                    "--prefix",
+                    "outsidecheck",
+                    "--output-dir",
+                    outside_dir,
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("output_dir must stay within repo", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_generate_suites_resolves_relative_output_dir_from_repo_root_even_outside_cwd(self) -> None:
+        build_root = ROOT / "build"
+        build_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=build_root) as tmpdir:
+            output_dir = Path(tmpdir) / "generated"
+            relative_output_dir = output_dir.relative_to(ROOT)
+            with tempfile.TemporaryDirectory() as outside_cwd:
+                result = subprocess.run(
+                    [
+                        "python3",
+                        str(ROOT / "generator/cli.py"),
+                        "generate-suites",
+                        "--pool",
+                        "scalar_misalign_full",
+                        "--count",
+                        "1",
+                        "--run-count",
+                        "2",
+                        "--seed",
+                        "20260421",
+                        "--prefix",
+                        "cwdcheck",
+                        "--output-dir",
+                        str(relative_output_dir),
+                    ],
+                    cwd=outside_cwd,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertEqual(0, result.returncode, msg=result.stderr)
+            index_path = Path(result.stdout.strip())
+            self.assertEqual(str((output_dir / "cwdcheck_batch.json").resolve()), str(index_path.resolve()))
+
+            payload = json.loads(index_path.read_text())
+            self.assertEqual(str(output_dir.resolve()), str((ROOT / payload["output_dir"]).resolve()))
+
+    def test_generate_suites_reports_output_dir_write_failure_without_traceback(self) -> None:
+        build_root = ROOT / "build"
+        build_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=build_root) as tmpdir:
+            output_file = Path(tmpdir) / "occupied"
+            output_file.write_text("occupied\n")
+            result = subprocess.run(
+                [
+                    "python3",
+                    "generator/cli.py",
+                    "generate-suites",
+                    "--pool",
+                    "scalar_misalign_full",
+                    "--count",
+                    "1",
+                    "--run-count",
+                    "1",
+                    "--seed",
+                    "7",
+                    "--prefix",
+                    "writefail",
+                    "--output-dir",
+                    str(output_file.relative_to(ROOT)),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("File exists", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_unaligned_load_riscv_path_uses_real_word_load(self) -> None:

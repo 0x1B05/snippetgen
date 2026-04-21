@@ -56,6 +56,10 @@
 - `--seed`
 - `--output-dir`
 - `--prefix`
+- `--output-dir`:
+  - 相对路径一律按 repo root 解释
+  - 路径必须留在 repo 内
+  - 路径类失败需要干净报错，不能带 traceback
 
 ### 3. Output
 

@@ -891,8 +891,11 @@ class BuildPipelineTest(unittest.TestCase):
         )
 
     def test_generated_scalar_misalign_random_suite_builds(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
+        build_root = ROOT / "build"
+        build_root.mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=build_root) as tmpdir:
             output_dir = Path(tmpdir) / "generated"
+            relative_output_dir = output_dir.relative_to(ROOT)
             generate = subprocess.run(
                 [
                     "python3",
@@ -909,7 +912,7 @@ class BuildPipelineTest(unittest.TestCase):
                     "--prefix",
                     "test_generated_scalar_misalign_full",
                     "--output-dir",
-                    str(output_dir),
+                    str(relative_output_dir),
                 ],
                 cwd=ROOT,
                 check=False,

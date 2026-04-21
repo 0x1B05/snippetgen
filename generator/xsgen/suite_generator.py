@@ -85,6 +85,17 @@ def _portable_path(repo_root: Path, path: Path) -> str:
         return str(resolved)
 
 
+def _resolve_output_dir(repo_root: Path, output_dir: Path) -> Path:
+    repo_base = repo_root.resolve()
+    candidate = output_dir if output_dir.is_absolute() else repo_base / output_dir
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(repo_base)
+    except ValueError as exc:
+        raise ValueError(f"output_dir must stay within repo: {output_dir}") from exc
+    return resolved
+
+
 def generate_suites(
     *,
     pool: SuitePool,
@@ -152,7 +163,8 @@ def write_generated_suites(
 ) -> Path:
     pool = load_suite_pool(pool_name)
     suite_prefix = _validate_prefix(prefix or _default_prefix(pool.name))
-    destination = (output_dir if output_dir is not None else _default_output_dir(repo_root, suite_prefix)).resolve()
+    raw_destination = output_dir if output_dir is not None else _default_output_dir(repo_root, suite_prefix)
+    destination = _resolve_output_dir(repo_root, raw_destination)
     generated = generate_suites(
         pool=pool,
         suite_count=suite_count,
