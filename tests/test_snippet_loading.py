@@ -1324,6 +1324,52 @@ class SnippetLoadingTest(unittest.TestCase):
         self.assertIn("xsrt_csr_write(13u, probe0_half16);", source)
         self.assertIn("xsrt_csr_write(14u, probe0_byte8);", source)
 
+    def test_scalar_misalign_load_split_source_uses_seed_driven_rounds_and_summary(self) -> None:
+        source = (ROOT / "snippets/scalar_misalign/load_split_templates.c").read_text()
+        check = (ROOT / "snippets/scalar_misalign/check_load_split_templates.c").read_text()
+
+        self.assertIn("xs_scalar_misalign_load_rounds", source)
+        self.assertIn("xs_scalar_misalign_load_rotation", source)
+        self.assertIn("xs_scalar_misalign_load_bank_seed", source)
+        self.assertIn("env->seed", source)
+        self.assertIn("xs_scalar_misalign_expected_load_summary", check)
+        self.assertIn("env->seed", check)
+        self.assertNotIn("XS_SCALAR_MISALIGN_CSR_TEMPLATE_COUNT", check)
+
+    def test_scalar_misalign_store_split_source_uses_seed_driven_rounds_and_summary(self) -> None:
+        source = (ROOT / "snippets/scalar_misalign/store_split_templates.c").read_text()
+        check = (ROOT / "snippets/scalar_misalign/check_store_split_templates.c").read_text()
+
+        self.assertIn("xs_scalar_misalign_store_rounds", source)
+        self.assertIn("xs_scalar_misalign_store_rotation", source)
+        self.assertIn("xs_scalar_misalign_store_bank_seed", source)
+        self.assertIn("env->seed", source)
+        self.assertIn("xs_scalar_misalign_expected_store_summary", check)
+        self.assertIn("env->seed", check)
+        self.assertNotIn("XS_SCALAR_MISALIGN_CSR_TEMPLATE_COUNT", check)
+
+    def test_scalar_misalign_store_forward_overlap_source_uses_seed_driven_rounds_and_values(self) -> None:
+        source = (ROOT / "snippets/scalar_misalign/store_forward_overlap.c").read_text()
+        check = (ROOT / "snippets/scalar_misalign/check_store_forward_overlap.c").read_text()
+
+        self.assertIn("xs_scalar_misalign_forward_rounds", source)
+        self.assertIn("xs_scalar_misalign_target_value", source)
+        self.assertIn("xs_scalar_misalign_forward_skid", source)
+        self.assertIn("env->seed", source)
+        self.assertIn("xs_scalar_misalign_expected_forward_summary", check)
+        self.assertIn("xs_scalar_misalign_expected_target_value", check)
+
+    def test_scalar_misalign_cross_page_source_uses_seed_driven_rounds_and_offsets(self) -> None:
+        source = (ROOT / "snippets/scalar_misalign/cross_page_faults.c").read_text()
+        check = (ROOT / "snippets/scalar_misalign/check_cross_page_faults.c").read_text()
+
+        self.assertIn("xs_scalar_misalign_cross_rounds", source)
+        self.assertIn("xs_scalar_misalign_load_offsets", source)
+        self.assertIn("xs_scalar_misalign_store_offsets", source)
+        self.assertIn("env->seed", source)
+        self.assertIn("xs_scalar_misalign_expected_cross_summary", check)
+        self.assertIn("env->seed", check)
+
     def test_declared_python_dependency(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text()
         self.assertIn("PyYAML", requirements)

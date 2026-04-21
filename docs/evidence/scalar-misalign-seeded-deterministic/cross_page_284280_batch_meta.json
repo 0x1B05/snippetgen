@@ -1,0 +1,30 @@
+{
+  "entries": [
+    {
+      "artifact_dir": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280",
+      "bin": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/test.bin",
+      "disasm": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/disasm",
+      "elf": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/test.elf",
+      "finish_code": 0,
+      "labels": [
+        "built",
+        "ran",
+        "good_trap"
+      ],
+      "notes": "HIT GOOD TRAP",
+      "returncode": 0,
+      "run_batch": "record_scalar_misalign_cross_page_284280",
+      "run_meta": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/run_meta.json",
+      "seed": 284280,
+      "status": "ran",
+      "stderr_log": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/stderr.log",
+      "stdout_log": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/stdout.log",
+      "suite": "scalar_misalign_cross_page_faults_poc",
+      "target": "xiangshan-verilator",
+      "wave_path": "/home/dfpmts/XS/framework/snippetgen-demo/build/scalar_misalign_cross_page_faults_poc/runs/record_scalar_misalign_cross_page_284280/seed_284280/lightsss-wave"
+    }
+  ],
+  "run_batch": "record_scalar_misalign_cross_page_284280",
+  "suite": "scalar_misalign_cross_page_faults_poc",
+  "target": "xiangshan-verilator"
+}

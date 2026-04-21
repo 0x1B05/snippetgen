@@ -37,6 +37,9 @@ static volatile uint64_t xs_scalar_misalign_fault_causes[2];
 static volatile uintptr_t xs_scalar_misalign_fault_tvals[2];
 static uintptr_t xs_scalar_misalign_saved_satp;
 
+static const uint16_t xs_scalar_misalign_load_offsets[] = {4093u, 4094u, 4095u, 4093u};
+static const uint16_t xs_scalar_misalign_store_offsets[] = {4095u, 4094u, 4093u, 4095u};
+
 static unsigned xs_scalar_misalign_vpn2(uintptr_t va) {
   return (unsigned) ((va >> 30) & XS_SCALAR_MISALIGN_VPN_MASK);
 }
@@ -181,10 +184,36 @@ static xsrt_trap_frame_t *xs_scalar_misalign_cross_page_handler(xsrt_trap_frame_
   return frame;
 }
 
+static unsigned xs_scalar_misalign_cross_rounds(uint64_t seed) {
+  return 2u + (unsigned) ((seed >> 2) & 0x3u);
+}
+
+static unsigned xs_scalar_misalign_cross_load_seed(uint64_t seed) {
+  return (unsigned) (seed & 0x3u);
+}
+
+static unsigned xs_scalar_misalign_cross_store_seed(uint64_t seed) {
+  return (unsigned) ((seed >> 4) & 0x3u);
+}
+
+static uint64_t xs_scalar_misalign_cross_summary(uint64_t seed) {
+  return ((uint64_t) XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC << 32) |
+      ((uint64_t) xs_scalar_misalign_cross_store_seed(seed) << 16) |
+      ((uint64_t) xs_scalar_misalign_cross_load_seed(seed) << 8) |
+      (uint64_t) xs_scalar_misalign_cross_rounds(seed);
+}
+
+static void xs_scalar_misalign_fill_window(unsigned char *base, unsigned start, unsigned size, uint64_t seed) {
+  for (unsigned index = 0; index < size; ++index) {
+    base[start + index] = (unsigned char) ((seed + index) & 0xffu);
+  }
+}
+
 static int cross_page_faults_run(xsrt_env_t *env) {
   volatile uint64_t sink = 0u;
-  const uintptr_t load_ptr = xs_scalar_misalign_load_base_va + 4093u;
-  const uintptr_t store_ptr = xs_scalar_misalign_store_base_va + 4095u;
+  const unsigned rounds = xs_scalar_misalign_cross_rounds(env != 0 ? env->seed : 0u);
+  const unsigned load_seed = xs_scalar_misalign_cross_load_seed(env != 0 ? env->seed : 0u);
+  const unsigned store_seed = xs_scalar_misalign_cross_store_seed(env != 0 ? env->seed : 0u);
 
   if (env == 0) {
     return -1;
@@ -208,9 +237,61 @@ static int cross_page_faults_run(xsrt_env_t *env) {
   xs_scalar_misalign_configure_pmp();
   xs_scalar_misalign_install_root();
 
-  sink = xs_scalar_misalign_faulting_load(load_ptr);
-  (void) sink;
-  xs_scalar_misalign_faulting_store(store_ptr, 0x1122334455667788ull);
+  for (unsigned round = 0; round < rounds; ++round) {
+    const uintptr_t load_ptr =
+        xs_scalar_misalign_load_base_va + xs_scalar_misalign_load_offsets[(load_seed + round) & 0x3u];
+    const uintptr_t store_ptr =
+        xs_scalar_misalign_store_base_va + xs_scalar_misalign_store_offsets[(store_seed + round) & 0x3u];
+
+    xs_scalar_misalign_fill_window(xs_scalar_misalign_load_backing[0], 4096u - 16u, 16u, env->seed ^ round);
+    xs_scalar_misalign_fill_window(xs_scalar_misalign_load_backing[1], 0u, 16u, (env->seed << 1) ^ round);
+    xs_scalar_misalign_fill_window(xs_scalar_misalign_store_backing, 4096u - 16u, 16u, (env->seed << 2) ^ round);
+
+    xs_scalar_misalign_fault_count = 0u;
+    xs_scalar_misalign_fault_causes[0] = 0u;
+    xs_scalar_misalign_fault_causes[1] = 0u;
+    xs_scalar_misalign_fault_tvals[0] = 0u;
+    xs_scalar_misalign_fault_tvals[1] = 0u;
+
+    sink = xs_scalar_misalign_faulting_load(load_ptr);
+    (void) sink;
+    xs_scalar_misalign_faulting_store(store_ptr, 0x1122334455667788ull ^ ((uint64_t) round << 8));
+
+    if (xs_scalar_misalign_fault_count != 2u) {
+      xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 321u + (uint64_t) (round * 5u));
+      xs_scalar_misalign_restore_root();
+      xsrt_install_strap(0);
+      return XS_SCALAR_MISALIGN_RC_CROSS_PAGE;
+    }
+
+    if (xs_scalar_misalign_fault_causes[0] != XS_SCALAR_MISALIGN_LOAD_PAGE_CAUSE) {
+      xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 322u + (uint64_t) (round * 5u));
+      xs_scalar_misalign_restore_root();
+      xsrt_install_strap(0);
+      return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 1;
+    }
+
+    if (xs_scalar_misalign_fault_causes[1] != XS_SCALAR_MISALIGN_STORE_ACCESS_CAUSE) {
+      xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 323u + (uint64_t) (round * 5u));
+      xs_scalar_misalign_restore_root();
+      xsrt_install_strap(0);
+      return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 2;
+    }
+
+    if (xs_scalar_misalign_fault_tvals[0] != xs_scalar_misalign_load_base_va + 4096u) {
+      xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 324u + (uint64_t) (round * 5u));
+      xs_scalar_misalign_restore_root();
+      xsrt_install_strap(0);
+      return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 3;
+    }
+
+    if (xs_scalar_misalign_fault_tvals[1] != xs_scalar_misalign_store_base_va + 4096u) {
+      xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 325u + (uint64_t) (round * 5u));
+      xs_scalar_misalign_restore_root();
+      xsrt_install_strap(0);
+      return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 4;
+    }
+  }
 
   xs_scalar_misalign_restore_root();
   xsrt_install_strap(0);
@@ -220,35 +301,8 @@ static int cross_page_faults_run(xsrt_env_t *env) {
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_TVAL0, xs_scalar_misalign_fault_tvals[0]);
   xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_TVAL1, xs_scalar_misalign_fault_tvals[1]);
 
-  if (xs_scalar_misalign_fault_count != 2u) {
-    xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 321u);
-    return XS_SCALAR_MISALIGN_RC_CROSS_PAGE;
-  }
-
-  if (xs_scalar_misalign_fault_causes[0] != XS_SCALAR_MISALIGN_LOAD_PAGE_CAUSE) {
-    xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 322u);
-    return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 1;
-  }
-
-  if (xs_scalar_misalign_fault_causes[1] != XS_SCALAR_MISALIGN_STORE_ACCESS_CAUSE) {
-    xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 323u);
-    return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 2;
-  }
-
-  if (xs_scalar_misalign_fault_tvals[0] != xs_scalar_misalign_load_base_va + 4096u) {
-    xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 324u);
-    return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 3;
-  }
-
-  if (xs_scalar_misalign_fault_tvals[1] != xs_scalar_misalign_store_base_va + 4096u) {
-    xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_FAIL_CASE, 325u);
-    return XS_SCALAR_MISALIGN_RC_CROSS_PAGE + 4;
-  }
-
-  xsrt_csr_write(
-      XS_SCALAR_MISALIGN_CSR_CROSS_SUMMARY,
-      ((uint64_t) XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC << 32) | 2u);
-  env->snippet_id = XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC ^ 2u;
+  xsrt_csr_write(XS_SCALAR_MISALIGN_CSR_CROSS_SUMMARY, xs_scalar_misalign_cross_summary(env->seed));
+  env->snippet_id = XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC ^ (uint64_t) rounds;
   env->flags |= (uint64_t) XS_SCALAR_MISALIGN_FLAG_CROSS_PAGE_COMPLETED;
   return 0;
 }

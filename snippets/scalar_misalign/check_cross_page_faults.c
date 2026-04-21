@@ -4,6 +4,17 @@
 #include "xs_snippet.h"
 #include "xsrt_csr.h"
 
+static uint64_t xs_scalar_misalign_expected_cross_summary(uint64_t seed) {
+  const unsigned rounds = 2u + (unsigned) ((seed >> 2) & 0x3u);
+  const unsigned load_seed = (unsigned) (seed & 0x3u);
+  const unsigned store_seed = (unsigned) ((seed >> 4) & 0x3u);
+
+  return ((uint64_t) XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC << 32) |
+      ((uint64_t) store_seed << 16) |
+      ((uint64_t) load_seed << 8) |
+      (uint64_t) rounds;
+}
+
 static int check_cross_page_faults_check(xsrt_env_t *env) {
   if (env == 0) {
     return -1;
@@ -25,9 +36,8 @@ static int check_cross_page_faults_check(xsrt_env_t *env) {
     return 424;
   }
 
-  if (
-      xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_CROSS_SUMMARY) !=
-      (((uint64_t) XS_SCALAR_MISALIGN_CROSS_PAGE_MAGIC << 32) | 2u)) {
+  if (xsrt_csr_read(XS_SCALAR_MISALIGN_CSR_CROSS_SUMMARY) !=
+      xs_scalar_misalign_expected_cross_summary(env->seed)) {
     return 425;
   }
 
