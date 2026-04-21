@@ -15,6 +15,7 @@ if str(REPO_ROOT) not in sys.path:
 from generator.xsgen.snippet_db import load_snippet_db
 from generator.xsgen.suite_loader import build_compose_plan, load_suite
 from generator.xsgen.emitter import emit_harness
+from generator.xsgen.suite_generator import list_suite_pools, write_generated_suites
 from generator.xsgen.toolchain import artifact_paths_for_suite, build_artifacts
 from generator.xsgen.run_batch import normalize_seeds, run_suite_batch
 
@@ -35,6 +36,12 @@ def cmd_list_snippets(_: argparse.Namespace) -> int:
     snippet_db = load_snippet_db(REPO_ROOT)
     for snippet_id in sorted(snippet_db):
         print(snippet_id)
+    return 0
+
+
+def cmd_list_suite_pools(_: argparse.Namespace) -> int:
+    for pool_name in list_suite_pools():
+        print(pool_name)
     return 0
 
 
@@ -91,12 +98,33 @@ def cmd_run(args: argparse.Namespace) -> int:
     return _run_exit_code(ledger_path)
 
 
+def cmd_generate_suites(args: argparse.Namespace) -> int:
+    output_dir = None if args.output_dir is None else Path(args.output_dir)
+    try:
+        index_path = write_generated_suites(
+            repo_root=REPO_ROOT,
+            pool_name=args.pool,
+            suite_count=args.count,
+            run_count=args.run_count,
+            generator_seed=args.seed,
+            output_dir=output_dir,
+            prefix=args.prefix,
+        )
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(index_path)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="snippetgen")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     list_parser = subparsers.add_parser("list-snippets")
     list_parser.set_defaults(handler=cmd_list_snippets)
+
+    list_pools_parser = subparsers.add_parser("list-suite-pools")
+    list_pools_parser.set_defaults(handler=cmd_list_suite_pools)
 
     dump_parser = subparsers.add_parser("dump-plan")
     dump_parser.add_argument("suite")
@@ -116,6 +144,15 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--jobs", type=int, default=1)
     run_parser.add_argument("--timeout-sec", type=int)
     run_parser.set_defaults(handler=cmd_run)
+
+    generate_parser = subparsers.add_parser("generate-suites")
+    generate_parser.add_argument("--pool", required=True, choices=list_suite_pools())
+    generate_parser.add_argument("--count", type=int, required=True)
+    generate_parser.add_argument("--run-count", type=int, default=4)
+    generate_parser.add_argument("--seed", type=int, required=True)
+    generate_parser.add_argument("--output-dir")
+    generate_parser.add_argument("--prefix")
+    generate_parser.set_defaults(handler=cmd_generate_suites)
 
     return parser
 

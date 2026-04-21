@@ -1281,6 +1281,139 @@ class SnippetLoadingTest(unittest.TestCase):
         self.assertTrue(plan["artifacts"]["bin"].endswith("build/scalar_load_legality_poc/test.bin"))
         self.assertTrue(plan["artifacts"]["build_manifest"].endswith("build/scalar_load_legality_poc/build_manifest.json"))
 
+    def test_cli_lists_built_in_suite_pools(self) -> None:
+        result = subprocess.run(
+            ["python3", "generator/cli.py", "list-suite-pools"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(0, result.returncode, msg=result.stderr)
+        self.assertIn("scalar_misalign_full", result.stdout)
+
+    def test_generate_suites_writes_deferred_suite_files_and_batch_index(self) -> None:
+        snippet_db = importlib.import_module("generator.xsgen.snippet_db")
+        suite_loader = importlib.import_module("generator.xsgen.suite_loader")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "generated"
+            result = subprocess.run(
+                [
+                    "python3",
+                    "generator/cli.py",
+                    "generate-suites",
+                    "--pool",
+                    "scalar_misalign_full",
+                    "--count",
+                    "2",
+                    "--run-count",
+                    "3",
+                    "--seed",
+                    "20260421",
+                    "--prefix",
+                    "scalar_misalign_full_rand",
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, result.returncode, msg=result.stderr)
+
+            index_path = Path(result.stdout.strip())
+            self.assertTrue(index_path.is_file())
+
+            payload = json.loads(index_path.read_text())
+            self.assertEqual("scalar_misalign_full", payload["pool"])
+            self.assertEqual(2, payload["suite_count"])
+            self.assertEqual(3, payload["run_count"])
+            self.assertEqual(2, len(payload["suites"]))
+            self.assertEqual(str(output_dir.resolve()), str((ROOT / payload["output_dir"]).resolve()))
+
+            db = snippet_db.load_snippet_db(ROOT)
+            valid_run_ids = {
+                "load_split_templates",
+                "store_split_templates",
+                "store_forward_overlap",
+                "cross_page_faults",
+            }
+            valid_check_ids = {
+                "check_load_split_templates",
+                "check_store_split_templates",
+                "check_store_forward_overlap",
+                "check_cross_page_faults",
+            }
+
+            for index, suite_entry in enumerate(payload["suites"]):
+                suite_path = Path(suite_entry["path"])
+                if not suite_path.is_absolute():
+                    suite_path = ROOT / suite_path
+                self.assertTrue(suite_path.is_file())
+                suite = suite_loader.load_suite(suite_path)
+                plan = suite_loader.build_compose_plan(suite, db)
+                self.assertEqual(f"scalar_misalign_full_rand_{index:03d}", suite.name)
+                self.assertEqual("init_basic_env", plan.run_snippet_ids[0])
+                self.assertEqual("finish_check", plan.check_snippet_ids[-1])
+                self.assertEqual(4, len(plan.run_snippet_ids))
+                self.assertEqual(4, len(plan.check_snippet_ids))
+                self.assertTrue(set(plan.run_snippet_ids[1:]).issubset(valid_run_ids))
+                self.assertTrue(set(plan.check_snippet_ids[:-1]).issubset(valid_check_ids))
+
+    def test_generate_suites_reports_clean_validation_error(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "generator/cli.py",
+                "generate-suites",
+                "--pool",
+                "scalar_misalign_full",
+                "--count",
+                "0",
+                "--run-count",
+                "99",
+                "--seed",
+                "7",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("suite_count must be positive", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_generate_suites_rejects_invalid_prefix_without_traceback(self) -> None:
+        result = subprocess.run(
+            [
+                "python3",
+                "generator/cli.py",
+                "generate-suites",
+                "--pool",
+                "scalar_misalign_full",
+                "--count",
+                "1",
+                "--run-count",
+                "1",
+                "--seed",
+                "7",
+                "--prefix",
+                "../escape",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("invalid suite prefix", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
     def test_unaligned_load_riscv_path_uses_real_word_load(self) -> None:
         source = (ROOT / "snippets/scalar_load_legality/unaligned_load.c").read_text()
         self.assertIn('"lw %0, 0(%1)"', source)

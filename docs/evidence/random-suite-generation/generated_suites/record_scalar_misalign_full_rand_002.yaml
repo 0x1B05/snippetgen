@@ -1,0 +1,15 @@
+suite: record_scalar_misalign_full_rand_002
+target: xiangshan-verilator
+seed: 321564562
+compose:
+  mode: sequence
+  run_snippets:
+  - init_basic_env
+  - store_forward_overlap
+  - load_split_templates
+  - store_split_templates
+  check_snippets:
+  - check_store_forward_overlap
+  - check_store_split_templates
+  - check_load_split_templates
+  - finish_check

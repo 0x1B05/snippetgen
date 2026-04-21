@@ -42,6 +42,7 @@ class BuildPipelineTest(unittest.TestCase):
         self.scalar_misalign_templates_combo_build_dir = ROOT / "build" / "scalar_misalign_templates_combo_poc"
         self.scalar_misalign_fault_forward_combo_build_dir = ROOT / "build" / "scalar_misalign_fault_forward_combo_poc"
         self.scalar_misalign_family_combo_build_dir = ROOT / "build" / "scalar_misalign_family_combo_poc"
+        self.generated_random_suite_build_dir = ROOT / "build" / "test_generated_scalar_misalign_full_000"
         self.nexus_cputest_unalign_build_dir = ROOT / "build" / "nexus_cputest_unalign_poc"
         self.nexus_cputest_load_store_build_dir = ROOT / "build" / "nexus_cputest_load_store_poc"
         self.nexus_memscan_access_fault_build_dir = ROOT / "build" / "nexus_memscan_access_fault_poc"
@@ -100,6 +101,8 @@ class BuildPipelineTest(unittest.TestCase):
             shutil.rmtree(self.scalar_misalign_fault_forward_combo_build_dir)
         if self.scalar_misalign_family_combo_build_dir.exists():
             shutil.rmtree(self.scalar_misalign_family_combo_build_dir)
+        if self.generated_random_suite_build_dir.exists():
+            shutil.rmtree(self.generated_random_suite_build_dir)
         if self.nexus_cputest_unalign_build_dir.exists():
             shutil.rmtree(self.nexus_cputest_unalign_build_dir)
         if self.nexus_cputest_load_store_build_dir.exists():
@@ -886,6 +889,53 @@ class BuildPipelineTest(unittest.TestCase):
                 "finish_check",
             ],
         )
+
+    def test_generated_scalar_misalign_random_suite_builds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "generated"
+            generate = subprocess.run(
+                [
+                    "python3",
+                    "generator/cli.py",
+                    "generate-suites",
+                    "--pool",
+                    "scalar_misalign_full",
+                    "--count",
+                    "1",
+                    "--run-count",
+                    "3",
+                    "--seed",
+                    "20260421",
+                    "--prefix",
+                    "test_generated_scalar_misalign_full",
+                    "--output-dir",
+                    str(output_dir),
+                ],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, generate.returncode, msg=generate.stderr)
+            batch_index = json.loads(Path(generate.stdout.strip()).read_text())
+            suite_path = batch_index["suites"][0]["path"]
+
+            result = subprocess.run(
+                ["python3", "generator/cli.py", "build", suite_path],
+                cwd=ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(0, result.returncode, msg=result.stderr)
+
+            build_manifest = self.generated_random_suite_build_dir / "build_manifest.json"
+            self.assertTrue(build_manifest.is_file())
+
+            manifest = json.loads(build_manifest.read_text())
+            self.assertEqual("test_generated_scalar_misalign_full_000", manifest["suite"])
+            self.assertEqual("init_basic_env", manifest["snippet_ids"][0])
+            self.assertEqual("finish_check", manifest["snippet_ids"][-1])
 
     def test_nexus_cputest_load_store_suite_build_generates_artifacts_and_manifest(self) -> None:
         result = subprocess.run(
