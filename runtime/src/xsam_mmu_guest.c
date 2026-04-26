@@ -2,6 +2,9 @@
 
 enum {
   XSAM_MMU_EXC_VS_ECALL = 10,
+  XSAM_MMU_MSTATUS_MPP_MASK = (uintptr_t)3 << 11,
+  XSAM_MMU_MSTATUS_MPP_M = (uintptr_t)3 << 11,
+  XSAM_MMU_MSTATUS_MPV_MASK = (uintptr_t)1 << 39,
   XSAM_MMU_SSTATUS_SPP_MASK = (uintptr_t)1 << 8,
   XSAM_MMU_HSTATUS_SPV_MASK = (uintptr_t)1 << 7,
 };
@@ -226,6 +229,9 @@ int xsam_mmu_handle_vs_trap(xsrt_trap_frame_t *frame) {
   xsam_mmu_write_hyp_csr(XSAM_MMU_CSR_HSTATUS, hstatus & ~XSAM_MMU_HSTATUS_SPV_MASK);
   xsam_mmu_vs_returned = 1;
   frame->epc = (uintptr_t)xsam_mmu_vs_resume_asm;
+  frame->status = (frame->status &
+                   ~(XSAM_MMU_MSTATUS_MPP_MASK | XSAM_MMU_MSTATUS_MPV_MASK)) |
+                  XSAM_MMU_MSTATUS_MPP_M;
   return 1;
 #else
   (void)frame;

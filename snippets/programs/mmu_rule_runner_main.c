@@ -11,6 +11,8 @@
 static const uintptr_t XS_RULE_HSTATUS_SPVP_MASK = (uintptr_t)1 << 8;
 static const uintptr_t XS_RULE_RUNTIME_IDENTITY_BASE = 0x80000000ull;
 static const uintptr_t XS_RULE_RUNTIME_IDENTITY_SIZE = 0x40000000ull;
+static const uintptr_t XS_RULE_RUNTIME_VS_STAGE1_IDENTITY_SIZE = 0x00400000ull;
+static const uintptr_t XS_RULE_RUNTIME_STAGE2_IDENTITY_SIZE = 0x00400000ull;
 static const uintptr_t XS_RULE_PTE_LEAF_PERMS = XSAM_MMU_PTE_R | XSAM_MMU_PTE_W | XSAM_MMU_PTE_X;
 static const uint32_t XS_RULE_EXEC_SEED = 0x00008067u;
 static const unsigned long XS_RULE_PRIMARY_SEED = 0x1122334455667788ull;
@@ -361,6 +363,18 @@ static unsigned long xs_expected_observation_value(const xs_generated_mmu_rule_t
   return XS_RULE_PRIMARY_SEED;
 }
 
+static int xs_rule_uses_stage2(const xs_generated_mmu_rule_t *rule) {
+  if (rule == 0) {
+    return 0;
+  }
+  return xs_string_eq(rule->mode, "onlyStage2") ||
+      xs_string_eq(rule->mode, "allStage");
+}
+
+static int xs_rule_uses_all_stage(const xs_generated_mmu_rule_t *rule) {
+  return rule != 0 && xs_string_eq(rule->mode, "allStage");
+}
+
 static void xs_configure_rule_context(
     const xs_generated_mmu_rule_t *rule,
     xsam_mmu_page_table_t *stage1,
@@ -377,6 +391,22 @@ static void xs_configure_rule_context(
         stage1,
         XS_RULE_RUNTIME_IDENTITY_BASE,
         XS_RULE_RUNTIME_IDENTITY_SIZE,
+        XSAM_MMU_PTE_R | XSAM_MMU_PTE_W | XSAM_MMU_PTE_X |
+            XSAM_MMU_PTE_A | XSAM_MMU_PTE_D);
+  }
+  if (xs_rule_uses_all_stage(rule)) {
+    xsam_mmu_pt_map_identity_range(
+        stage1,
+        XS_RULE_RUNTIME_IDENTITY_BASE,
+        XS_RULE_RUNTIME_VS_STAGE1_IDENTITY_SIZE,
+        XSAM_MMU_PTE_R | XSAM_MMU_PTE_W | XSAM_MMU_PTE_X |
+            XSAM_MMU_PTE_A | XSAM_MMU_PTE_D);
+  }
+  if (xs_rule_uses_stage2(rule)) {
+    xsam_mmu_pt_map_identity_range(
+        stage2,
+        XS_RULE_RUNTIME_IDENTITY_BASE,
+        XS_RULE_RUNTIME_STAGE2_IDENTITY_SIZE,
         XSAM_MMU_PTE_R | XSAM_MMU_PTE_W | XSAM_MMU_PTE_X |
             XSAM_MMU_PTE_A | XSAM_MMU_PTE_D);
   }
